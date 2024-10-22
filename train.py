@@ -13,7 +13,7 @@ from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from config.config import SharedOpt
 from model.squidnet import SQuiDNet
-from loader import SQDataset
+from loader import SQDataset, SQTrainDataset
 from inference import eval_epoch
 from optim.adamw import AdamW
 from utils.basic_utils import AverageMeter,load_config
@@ -33,7 +33,7 @@ def train_epoch(model, train_loader, optimizer, opt, epoch_i ,training=True):
     num_training = len(train_loader)
     for batch_idx, batch in tqdm(enumerate(train_loader), desc="Training", total=num_training):
         global_step = epoch_i * num_training + batch_idx
-
+        breakpoint()
         # continue
         model_inputs = set_cuda(batch["model_inputs"], opt.device)
         loss, loss_dict = model(model_inputs)
@@ -80,18 +80,18 @@ def build_optimizer(model, opts):
     return optimizer
 
 
-def train(model, train_dataset, train_eval_dataset, val_dataset, opt):
+def train(model, train_dataset, val_dataset, opt):
     # Prepare optimizer
-    if opt.device.type == "cuda":
-        logger.info("CUDA enabled.")
-        model.to(opt.device)
-        #assert len(opt.device_ids) == 1
-        if len(opt.device_ids) > 1:
-            #logger.info("Use multi GPU", opt.device_ids)
-            model = torch.nn.DataParallel(model, device_ids=opt.device_ids)  # use multi GPU
+    # if opt.device.type == "cuda":
+    #     logger.info("CUDA enabled.")
+    #     model.to(opt.device)
+    #     #assert len(opt.device_ids) == 1
+    #     if len(opt.device_ids) > 1:
+    #         #logger.info("Use multi GPU", opt.device_ids)
+    #         model = torch.nn.DataParallel(model, device_ids=opt.device_ids)  # use multi GPU
 
     train_loader = DataLoader(train_dataset, collate_fn=vcmr_collate, batch_size=opt.batch, num_workers=opt.num_workers, shuffle=True, pin_memory=True, drop_last=True)
-    train_eval_loader = DataLoader(train_eval_dataset, collate_fn=vcmr_collate, batch_size=opt.batch, num_workers=opt.num_workers, shuffle=False, pin_memory=True, drop_last=True)
+    # train_eval_loader = DataLoader(train_eval_dataset, collate_fn=vcmr_collate, batch_size=opt.batch, num_workers=opt.num_workers, shuffle=False, pin_memory=True, drop_last=True)
 
     # Prepare optimizer
     optimizer = build_optimizer(model, opt)
@@ -108,7 +108,7 @@ def train(model, train_dataset, train_eval_dataset, val_dataset, opt):
         global_step = (epoch_i + 1) * len(train_loader)
         if epoch_i % opt.eval_epoch_num == 0 or epoch_i == opt.n_epoch - 1 or epoch_i == start_epoch:
             with torch.no_grad():
-                train_epoch(model, train_eval_loader, optimizer, opt, epoch_i, training=False)
+                # train_epoch(model, train_eval_loader, optimizer, opt, epoch_i, training=False)
                 metrics_no_nms, metrics_nms, latest_file_paths = eval_epoch(model, val_dataset, opt, save_submission_filename, tasks=eval_tasks, max_after_nms=100)
             to_write = opt.eval_log_txt_formatter.format(time_str=time.strftime("%Y_%m_%d_%H_%M_%S"),epoch=epoch_i, eval_metrics_str=json.dumps(metrics_no_nms))
             with open(opt.eval_log_filepath, "a") as f:
@@ -177,8 +177,8 @@ def train_squid():
     opt.eval_log_txt_formatter = "{time_str}: epch {epoch:03d} metrics {eval_metrics_str}\n"
     
     data_config = load_config(opt.data_config)
-    train_dataset = SQDataset(data_type="train", config=data_config, neg_bmr_pred_num=opt.neg_bmr_pred_num, bmr_allowance=opt.bmr_allowance)
-    train_eval_dataset = SQDataset(data_type="val", config=data_config, max_vid_len=opt.max_vid_len, max_query_len=opt.max_query_len, neg_bmr_pred_num=opt.neg_bmr_pred_num, bmr_allowance=opt.bmr_allowance)
+    train_dataset = SQTrainDataset(config=data_config, neg_bmr_pred_num=opt.neg_bmr_pred_num, bmr_allowance=opt.bmr_allowance)
+    # train_eval_dataset = SQDataset(data_type="val", config=data_config, max_vid_len=opt.max_vid_len, max_query_len=opt.max_query_len, neg_bmr_pred_num=opt.neg_bmr_pred_num, bmr_allowance=opt.bmr_allowance)
     eval_dataset = SQDataset(data_type=opt.eval_type, config=data_config, max_vid_len=opt.max_vid_len, max_query_len=opt.max_query_len, is_val=True, max_vcmr_video=opt.max_vcmr_video)
 
     model_config = load_config(opt.model_config)
@@ -188,7 +188,8 @@ def train_squid():
     count_parameters(model)
 
     logger.info("Start Training...")
-    train(model, train_dataset, train_eval_dataset, eval_dataset, opt)
+    # train(model, train_dataset, train_eval_dataset, eval_dataset, opt)
+    train(model, train_dataset, eval_dataset, opt)
     return opt.results_dir, opt.eval_type
 
 

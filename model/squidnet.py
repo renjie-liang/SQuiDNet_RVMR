@@ -128,7 +128,6 @@ class SQuiDNet(nn.Module):
         loss_st = self.CE(start_time_distribution, st_ed_indices[:, 0])
         loss_ed = self.CE(end_time_distribution, st_ed_indices[:, 1])
         moment_debiasing_loss = loss_st + loss_ed
-
         return moment_debiasing_loss
 
 

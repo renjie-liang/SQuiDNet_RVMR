@@ -122,7 +122,7 @@ class SharedOpt(object):
         opt.eval_log_filepath = os.path.join(opt.results_dir, "eval.log.txt")
         opt.tensorboard_log_dir = os.path.join(opt.results_dir, "tensorboard_log")
         opt.device = torch.device("cuda:%d" % opt.device_ids[0] if opt.device >= 0 else "cpu")
-
+        opt.device = 'cpu'
         self.opt = opt
         return opt
 

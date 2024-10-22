@@ -9,5 +9,5 @@ python train.py \
     --eval_tasks VCMR SVMR VR \
     --max_vcmr_video 10 \
     --loss_measure moment_video \
-    --num_workers 8\
+    --num_workers 1\
     ${@:1}

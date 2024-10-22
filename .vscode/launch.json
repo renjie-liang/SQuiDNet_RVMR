@@ -1,0 +1,29 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python Debugger: Current File with Arguments",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "args": [
+                "--exp", "moment_video",
+                "--model_config", "config/model_config.json",
+                // "--data_config", "config/data_config.json",
+                "--data_config", "config/data_config_tvrr.json",
+                "--batch", "16",
+                "--eval_query_batch", "5",
+                "--task", "VCMR",
+                "--eval_tasks", "VCMR", "SVMR", "VR",
+                "--max_vcmr_video", "10",
+                "--loss_measure", "moment_video",
+                "--num_workers", "1"
+            ]
+        }
+    ]
+}
+
