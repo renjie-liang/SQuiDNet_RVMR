@@ -1,8 +1,8 @@
 {
-  "data_path": "./data/data",
-  "query_path": "sub_query_feature/roberta_query",
-  "sub_path": "sub_query_feature/roberta_sub",
-  "vid_path": "video_feature/resnet_slowfast_1.5",
+  "data_path": "/red/bianjiang/liang.renjie/RVMR/TVR-Ranking/data/features",
+  "query_path": "query_bert.h5",
+  "sub_path": "tvr_sub_pretrained_w_sub_query_max_cl-1.5.h5",
+  "vid_path": "tvr_i3d_rgb600_avg_cl-1.5.h5",
   "train_data_path": "text_data_ref/tvr_train_release_noun_predicate.jsonl",
   "eval_data_path": "text_data_ref/tvr_val_release_noun_predicate.jsonl",
   "test_data_path": "text_data_ref/tvr_test_public_release.jsonl",

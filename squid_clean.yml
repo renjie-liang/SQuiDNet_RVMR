@@ -1,0 +1,11 @@
+name: squid
+dependencies:
+  - python=3.9 
+  - pytorch
+  - tqdm
+  - tensorboard
+  - msgpack-numpy
+  - pip:
+    - easydict
+    - msgpack
+    - lmdb

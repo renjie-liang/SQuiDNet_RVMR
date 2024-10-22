@@ -64,10 +64,10 @@ def compute_query2vid(model, eval_dataset, opt, max_before_nms=200, max_vcmr_vid
     query_batch_size = opt.eval_query_batch
 
     if is_vcmr:
-        flat_st_ed_scores_sorted_indices = np.empty((n_total_query, max_before_nms), dtype=np.int)
+        flat_st_ed_scores_sorted_indices = np.empty((n_total_query, max_before_nms), dtype=int)
         flat_st_ed_sorted_scores = np.zeros((n_total_query, max_before_nms), dtype=np.float32)
     if is_vr :
-        sorted_q2c_indices = np.empty((n_total_query, max_vcmr_video), dtype=np.int)
+        sorted_q2c_indices = np.empty((n_total_query, max_vcmr_video), dtype=int)
         sorted_q2c_scores = np.empty((n_total_query, max_vcmr_video), dtype=np.float32)
     if is_svmr:
         svmr_gt_st_probs = np.zeros((n_total_query, opt.max_vid_len), dtype=np.float32)

@@ -103,14 +103,12 @@ def train(model, train_dataset, train_eval_dataset, val_dataset, opt):
     save_submission_filename = "latest_{}_{}_predictions_{}.json".format(opt.data_name, opt.eval_type, "_".join(eval_tasks))
     for epoch_i in trange(start_epoch, opt.n_epoch, desc="Epoch"):
         if epoch_i >= 0:
-
             train_epoch(model, train_loader, optimizer, opt, epoch_i, training=True)
 
         global_step = (epoch_i + 1) * len(train_loader)
         if epoch_i % opt.eval_epoch_num == 0 or epoch_i == opt.n_epoch - 1 or epoch_i == start_epoch:
             with torch.no_grad():
                 train_epoch(model, train_eval_loader, optimizer, opt, epoch_i, training=False)
-
                 metrics_no_nms, metrics_nms, latest_file_paths = eval_epoch(model, val_dataset, opt, save_submission_filename, tasks=eval_tasks, max_after_nms=100)
             to_write = opt.eval_log_txt_formatter.format(time_str=time.strftime("%Y_%m_%d_%H_%M_%S"),epoch=epoch_i, eval_metrics_str=json.dumps(metrics_no_nms))
             with open(opt.eval_log_filepath, "a") as f:
@@ -177,7 +175,7 @@ def train_squid():
     opt.writer = SummaryWriter(opt.tensorboard_log_dir)
     opt.train_log_txt_formatter = "{time_str}: epch {epoch:03d} loss {loss_str}\n"
     opt.eval_log_txt_formatter = "{time_str}: epch {epoch:03d} metrics {eval_metrics_str}\n"
-
+    
     data_config = load_config(opt.data_config)
     train_dataset = SQDataset(data_type="train", config=data_config, neg_bmr_pred_num=opt.neg_bmr_pred_num, bmr_allowance=opt.bmr_allowance)
     train_eval_dataset = SQDataset(data_type="val", config=data_config, max_vid_len=opt.max_vid_len, max_query_len=opt.max_query_len, neg_bmr_pred_num=opt.neg_bmr_pred_num, bmr_allowance=opt.bmr_allowance)
