@@ -28,27 +28,24 @@ def padding_feature(feature, max_feat_len):
 
     return feat_pad , feat_mask
 
+def expand_annotations(annotations):
+    new_annotations = []
+    for i in annotations:
+        query = i["query"]
+        query_id = i["query_id"]
+        noun = i["noun"]
+        verb = i["verb"]
+        for moment in  i["relevant_moment"]:
+            moment.update({'query': query, 'query_id': query_id, 'noun': noun, 'verb': verb})
+            new_annotations.append(moment)
+    return new_annotations
+
 class SQTrainDataset(Dataset):
     def __init__(self, config, max_vid_len=100, max_query_len=30, is_val=False, neg_bmr_pred_num=3, bmr_allowance=500, max_vcmr_video=10):
 
 
-        self.query_data = self.expand_annotations(load_json(config.train_data_path))
-
+        self.query_data = expand_annotations(load_json(config.train_data_path))
         self.data_root = config.data_path # ./data
-        # self.query_ft_path = os.path.join(self.data_root, config.query_path)
-        self.sub_ft_path = os.path.join(self.data_root, config.sub_path)
-        self.vid_ft_path = os.path.join(self.data_root, config.vid_path)
-
-        # In our further studies, we use bmr with hero, which shows better performances.
-        # if self.type == "train":
-        #     self.data_path = os.path.join(self.data_root, config.train_data_path)
-        #     self.bmr_pred_path = os.path.join(self.data_root, config.train_bmr_path)
-        # elif self.type == "val":
-        #     self.data_path = os.path.join(self.data_root, config.eval_data_path)
-        #     self.bmr_pred_path = os.path.join(self.data_root, config.eval_bmr_path)
-        # elif self.type == "test_public":
-        #     self.data_path = os.path.join(self.data_root, config.test_data_path)
-        #     self.bmr_pred_path = os.path.join(self.data_root, config.test_bmr_path)
 
         self.max_vid_len = max_vid_len
         self.max_query_len = max_query_len
@@ -57,21 +54,16 @@ class SQTrainDataset(Dataset):
         self.is_val = is_val
 
         # query_data is for referencing
-        # self.query_data = load_jsonl(self.data_path)
         self.desc_bert_h5 = h5py.File(config.query_path, "r")
 
         # ft is feature for query, sub and video
-        self.bmr_pred_path = os.path.join(self.data_root, config.train_bmr_path)
-        self.bmr_env = lmdb.open(self.bmr_pred_path, readonly=True, create=False, max_readers=4096 * 8, readahead=False)
+        self.bmr_env = lmdb.open(config.bmr_path, readonly=True, create=False, max_readers=4096 * 8, readahead=False)
         self.bmr_pred = self.bmr_env.begin(buffers=True)
         
-        # self.query_env = lmdb.open(self.query_ft_path, readonly=True, create=False, max_readers=4096 * 8, readahead=False)
-        # self.query_ft = self.query_env.begin(buffers=True)
-        
-        self.sub_bert_env = lmdb.open(self.sub_ft_path, readonly=True, create=False, max_readers=4096 * 8, readahead=False)
+        self.sub_bert_env = lmdb.open(config.sub_path, readonly=True, create=False, max_readers=4096 * 8, readahead=False)
         self.sub_bert_ft = self.sub_bert_env.begin(buffers=True)
         
-        self.vid_env = lmdb.open(self.vid_ft_path, readonly=True, create=False, max_readers=4096 * 8, readahead=False)
+        self.vid_env = lmdb.open(config.vid_path, readonly=True, create=False, max_readers=4096 * 8, readahead=False)
         self.vid_ft = self.vid_env.begin(buffers=True)
         
         self.cctable_path = os.path.join(self.data_root, config.cctable_path)
@@ -80,10 +72,6 @@ class SQTrainDataset(Dataset):
 
         self.vname_duration = load_json(config.video_duration_idx_path)
 
-        # vid_data = load_json(os.path.join(self.data_root, config.video_duration_idx_path))[self.type]
-        # self.vid_data = [{"vid_name": k, "duration": v[0]} for k, v in vid_data.items()]
-        # self.vid2idx = {k: v[1] for k, v in vid_data.items()}
-        # self.idx2vid = {v[1]:k for k, v in vid_data.items()}
         self.bmr_allowance = bmr_allowance
         self.max_vcmr_video = max_vcmr_video
 
@@ -95,15 +83,6 @@ class SQTrainDataset(Dataset):
         return len(self.query_data)
 
 
-    def expand_annotations(self, annotations):
-        new_annotations = []
-        for i in annotations:
-            query = i["query"]
-            query_id = i["query_id"]
-            for moment in  i["relevant_moment"]:
-                moment.update({'query': query, 'query_id': query_id})
-                new_annotations.append(moment)
-        return new_annotations
 
     def get_query_feat(self, desc_id, token_id=1):
         query_feat = self.desc_bert_h5[str(desc_id)][:self.max_query_len]
@@ -183,25 +162,19 @@ class SQTrainDataset(Dataset):
         is_positive = self.SQDecision(nouns, verbs)
         loc = 100
         for idx, item in enumerate(bmr_preds):
-            if target_vidname == self.idx2vid[item[0]]:
+            if target_vidname == item[0]:
                 loc = idx
                 break
         ##check all the location is below 100 when mode is train
-        if self.type =="train":
-            assert  0<=loc<100
-        if is_val:
-            # vcmr is performed on predictions from bmr
-            first_vr_video_pool_list = [ self.idx2vid[item[0]] for item in bmr_preds[:self.max_vcmr_video]]
-            total_vid_name_list = [target_vidname,] + first_vr_video_pool_list
-            self.vidnum_per_q = 1 + self.max_vcmr_video
+        # assert  0<=loc<100
+
+        vid_pool = [item[0] for item in bmr_preds if target_vidname != item[0]]
+        if is_positive:
+            sampled_vid = random.sample(vid_pool[:loc+int(self.bmr_allowance*0.1)], k=self.neg_bmr_pred_num)
         else:
-            vid_pool = [self.idx2vid[item[0]] for item in bmr_preds if target_vidname != self.idx2vid[item[0]] ]
-            if is_positive:
-                sampled_vid = random.sample(vid_pool[:loc+int(self.bmr_allowance*0.1)], k=self.neg_bmr_pred_num)
-            else:
-                sampled_vid = random.sample(vid_pool[:loc+self.bmr_allowance], k=self.neg_bmr_pred_num)
-            total_vid_name_list = [target_vidname,] + sampled_vid
-            self.vidnum_per_q = 1 + self.neg_bmr_pred_num
+            sampled_vid = random.sample(vid_pool[:loc+self.bmr_allowance], k=self.neg_bmr_pred_num)
+        total_vid_name_list = [target_vidname,] + sampled_vid
+        self.vidnum_per_q = 1 + self.neg_bmr_pred_num
         return total_vid_name_list, is_positive
 
     def __getitem__(self, index):
@@ -210,8 +183,8 @@ class SQTrainDataset(Dataset):
         annotation = dict(desc_id=ann["query_id"], desc=ann["query"], vid_name=ann["video_name"], ts=ann["timestamp"], noun=ann["noun"], verb=ann["verb"])
         # For the test_public(challenge), video annotation per query is not public
         # dummy with no use
-        if self.type =="test_public":
-            annotation["vid_name"] = "friends_s01e01_seg02_clip_00"
+        # if self.type =="test_public":
+        #     annotation["vid_name"] = "friends_s01e01_seg02_clip_00"
 
         model_inputs = dict()
         ## get query feature (RoBerta 768 dim)
@@ -220,10 +193,10 @@ class SQTrainDataset(Dataset):
         ## get BMR predictions per queries for negative or positive by SQuiD Decision
         bmr_preds = self.get_bmr_pred(annotation["desc_id"])
         is_positive = False
-        if self.is_val:
-            total_vid_name_list, is_positive = self.SQuiDSample(bmr_preds, annotation, self.is_val)
-        else:
-            total_vid_name_list, is_positive = self.SQuiDSample(bmr_preds, annotation, self.is_val)
+        # if self.is_val:
+        #     total_vid_name_list, is_positive = self.SQuiDSample(bmr_preds, annotation, self.is_val)
+        # else:
+        total_vid_name_list, is_positive = self.SQuiDSample(bmr_preds, annotation, is_val=False)
 
         # sampled neg_bmr_pred_num negative videos or top-k videos
         annotation["max_vcmr_vid_name_list"] = total_vid_name_list[1:]
@@ -235,14 +208,18 @@ class SQTrainDataset(Dataset):
         sub_feat = self.get_sub_feat(annotation["vid_name"])
         model_inputs["sub"] = self.get_nmr_bmr_vs_feat(sub_feat, total_vid_name_list, vs=False)
 
-        if not self.is_val:
-            max_vl = vid_L - 1
-            start_idx = min(math.floor(annotation["ts"][0] / 1.5), max_vl)
-            end_idx = min(math.ceil(annotation["ts"][1] / 1.5) - 1, max_vl)  # st_idx could be the same as ed_idx
-            assert 0 <= start_idx <= end_idx <= max_vl, (annotation["ts"], start_idx, end_idx, max_vl)
-            model_inputs["st_ed_indices"] =  torch.LongTensor([start_idx, end_idx])
+        max_vl = vid_L - 1
+        start_idx = min(math.floor(annotation["ts"][0] / 1.5), max_vl)
+        end_idx = min(math.ceil(annotation["ts"][1] / 1.5) - 1, max_vl)  # st_idx could be the same as ed_idx
+        assert 0 <= start_idx <= end_idx <= max_vl, (annotation["ts"], start_idx, end_idx, max_vl)
+        model_inputs["st_ed_indices"] =  torch.LongTensor([start_idx, end_idx])
 
         return dict(annotation=annotation, model_inputs=model_inputs)
+
+
+
+
+
 
 
 class SQDataset(Dataset):
@@ -277,8 +254,9 @@ class SQDataset(Dataset):
         self.bmr_env = lmdb.open(self.bmr_pred_path, readonly=True, create=False, max_readers=4096 * 8, readahead=False)
         self.bmr_pred = self.bmr_env.begin(buffers=True)
         
-        self.query_env = lmdb.open(self.query_ft_path, readonly=True, create=False, max_readers=4096 * 8, readahead=False)
-        self.query_ft = self.query_env.begin(buffers=True)
+        self.desc_bert_h5 = h5py.File(config.query_path, "r")
+        # self.query_env = lmdb.open(self.query_ft_path, readonly=True, create=False, max_readers=4096 * 8, readahead=False)
+        # self.query_ft = self.query_env.begin(buffers=True)
         
         self.sub_bert_env = lmdb.open(self.sub_ft_path, readonly=True, create=False, max_readers=4096 * 8, readahead=False)
         self.sub_bert_ft = self.sub_bert_env.begin(buffers=True)
@@ -290,10 +268,11 @@ class SQDataset(Dataset):
         with open(self.cctable_path, 'r') as ftmp:
             self.cctable = json.load(ftmp)
 
-        vid_data = load_json(os.path.join(self.data_root, config.video_duration_idx_path))[self.type]
-        self.vid_data = [{"vid_name": k, "duration": v[0]} for k, v in vid_data.items()]
-        self.vid2idx = {k: v[1] for k, v in vid_data.items()}
-        self.idx2vid = {v[1]:k for k, v in vid_data.items()}
+        self.vname_duration = load_json(config.video_duration_idx_path)
+        # vid_data = load_json(os.path.join(self.data_root, config.video_duration_idx_path))[self.type]
+        # self.vid_data = [{"vid_name": k, "duration": v[0]} for k, v in vid_data.items()]
+        # self.vid2idx = {k: v[1] for k, v in vid_data.items()}
+        # self.idx2vid = {v[1]:k for k, v in vid_data.items()}
         self.bmr_allowance = bmr_allowance
         self.max_vcmr_video = max_vcmr_video
 

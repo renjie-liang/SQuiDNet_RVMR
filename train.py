@@ -33,11 +33,9 @@ def train_epoch(model, train_loader, optimizer, opt, epoch_i ,training=True):
     num_training = len(train_loader)
     for batch_idx, batch in tqdm(enumerate(train_loader), desc="Training", total=num_training):
         global_step = epoch_i * num_training + batch_idx
-        breakpoint()
         # continue
         model_inputs = set_cuda(batch["model_inputs"], opt.device)
         loss, loss_dict = model(model_inputs)
-
         if training:
             optimizer.zero_grad()
             loss.backward()
@@ -82,28 +80,28 @@ def build_optimizer(model, opts):
 
 def train(model, train_dataset, val_dataset, opt):
     # Prepare optimizer
-    # if opt.device.type == "cuda":
-    #     logger.info("CUDA enabled.")
-    #     model.to(opt.device)
-    #     #assert len(opt.device_ids) == 1
-    #     if len(opt.device_ids) > 1:
-    #         #logger.info("Use multi GPU", opt.device_ids)
-    #         model = torch.nn.DataParallel(model, device_ids=opt.device_ids)  # use multi GPU
+    if opt.device.type == "cuda":
+        logger.info("CUDA enabled.")
+        model.to(opt.device)
+        #assert len(opt.device_ids) == 1
+        if len(opt.device_ids) > 1:
+            #logger.info("Use multi GPU", opt.device_ids)
+            model = torch.nn.DataParallel(model, device_ids=opt.device_ids)  # use multi GPU
 
     train_loader = DataLoader(train_dataset, collate_fn=vcmr_collate, batch_size=opt.batch, num_workers=opt.num_workers, shuffle=True, pin_memory=True, drop_last=True)
     # train_eval_loader = DataLoader(train_eval_dataset, collate_fn=vcmr_collate, batch_size=opt.batch, num_workers=opt.num_workers, shuffle=False, pin_memory=True, drop_last=True)
 
     # Prepare optimizer
     optimizer = build_optimizer(model, opt)
+    # optimizer = None
 
     prev_best_score = 0.
     es_cnt = 0
     start_epoch = 0 if opt.no_eval_untrained else -1
     eval_tasks = opt.eval_tasks 
     save_submission_filename = "latest_{}_{}_predictions_{}.json".format(opt.data_name, opt.eval_type, "_".join(eval_tasks))
-    for epoch_i in trange(start_epoch, opt.n_epoch, desc="Epoch"):
-        if epoch_i >= 0:
-            train_epoch(model, train_loader, optimizer, opt, epoch_i, training=True)
+    for epoch_i in range(start_epoch, opt.n_epoch):
+        train_epoch(model, train_loader, optimizer, opt, epoch_i, training=True)
 
         global_step = (epoch_i + 1) * len(train_loader)
         if epoch_i % opt.eval_epoch_num == 0 or epoch_i == opt.n_epoch - 1 or epoch_i == start_epoch:
@@ -183,8 +181,8 @@ def train_squid():
 
     model_config = load_config(opt.model_config)
     model = SQuiDNet(model_config, vid_dim=opt.vid_dim, text_dim=opt.text_dim, hidden_dim=opt.hidden_dim, lw_vid=opt.lw_vid, lw_st_ed=opt.lw_st_ed, loss_measure=opt.loss_measure)
+    # model = None
 
-    print(model)
     count_parameters(model)
 
     logger.info("Start Training...")
