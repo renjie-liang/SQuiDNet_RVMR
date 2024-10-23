@@ -80,7 +80,13 @@ class SharedOpt(object):
         self.parser.add_argument("--nms_thd", type=float, default=-1, help="optinally use non-maximum suppression")
         # can use config files
         self.parser.add_argument('--config', help='JSON config files')
+        
+        self.parser.add_argument("--results_path", type=str, default="results")
+        self.parser.add_argument("--exp_id", type=str, default=None, help="id of this run, required at training")
 
+
+        self.parser.add_argument("--eval_num_per_epoch", type=float, default=1.0, help="eval times during each epoch")
+        self.parser.add_argument("--log_step", type=int, default=100)
 
     def display_save(self, opt):
         args = vars(opt)

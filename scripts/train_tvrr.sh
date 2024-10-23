@@ -10,4 +10,5 @@ python train.py \
     --max_vcmr_video 10 \
     --loss_measure moment_video \
     --num_workers 8\
+    --exp_id debug \
     ${@:1}

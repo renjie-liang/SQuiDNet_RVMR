@@ -195,7 +195,7 @@ def eval_epoch(model, eval_dataset, opt, save_submission_filename, tasks=("VCMR"
     logger.info("Saving/Evaluating before nms results")
     submission_path = os.path.join(opt.results_dir, save_submission_filename)
     eval_submission = get_submission_top_n(eval_submission_raw, top_n=max_after_nms)
-    save_json(eval_submission, submission_path)
+    # save_json(eval_submission, submission_path)
 
     if opt.eval_type == "val":  # since test_public has no GT
         metrics = eval_retrieval(eval_submission, eval_dataset.query_data, iou_thds=IOU_THDS, match_number=True, verbose=False, use_desc_type=opt.data_name == "tvr")
@@ -218,11 +218,11 @@ def eval_epoch(model, eval_dataset, opt, save_submission_filename, tasks=("VCMR"
 
         logger.info("Saving/Evaluating nms results")
         submission_nms_path = submission_path.replace(".json", "_nms_thd_{}.json".format(opt.nms_thd))
-        save_json(eval_submission_after_nms, submission_nms_path)
+        # save_json(eval_submission_after_nms, submission_nms_path)
         if opt.eval_type == "val":
             metrics_nms = eval_retrieval(eval_submission_after_nms, eval_dataset.query_data, iou_thds=IOU_THDS, match_number=True, verbose=False)
             save_metrics_nms_path = submission_nms_path.replace(".json", "_metrics.json")
-            save_json(metrics_nms, save_metrics_nms_path, save_pretty=True, sort_keys=False)
+            # save_json(metrics_nms, save_metrics_nms_path, save_pretty=True, sort_keys=False)
             latest_file_paths += [submission_nms_path, save_metrics_nms_path]
         else:
             metrics_nms = None

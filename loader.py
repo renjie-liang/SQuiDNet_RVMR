@@ -70,7 +70,7 @@ class SQTrainDataset(Dataset):
         with open(self.cctable_path, 'r') as ftmp:
             self.cctable = json.load(ftmp)
 
-        self.vname_duration = load_json(config.video_duration_idx_path)
+        self.vname_duration = load_json(config.corpus_path)
 
         self.bmr_allowance = bmr_allowance
         self.max_vcmr_video = max_vcmr_video
@@ -220,15 +220,13 @@ class SQTrainDataset(Dataset):
 
 
 
-
-
 class SQDataset(Dataset):
     def __init__(self, config, max_vid_len=100, max_query_len=30, data_type="train", is_val=False, neg_bmr_pred_num=3, bmr_allowance=500, max_vcmr_video=10):
 
         self.data_root = config.data_path # ./data
-        self.query_ft_path = os.path.join(self.data_root, config.query_path)
-        self.sub_ft_path = os.path.join(self.data_root, config.sub_path)
-        self.vid_ft_path = os.path.join(self.data_root, config.vid_path)
+        # self.query_ft_path = os.path.join(self.data_root, config.query_path)
+        # self.sub_ft_path = os.path.join(self.data_root, config.sub_path)
+        # self.vid_ft_path = os.path.join(self.data_root, config.vid_path)
         self.type = data_type
         # In our further studies, we use bmr with hero, which shows better performances.
         if self.type == "train":
@@ -248,31 +246,31 @@ class SQDataset(Dataset):
         self.is_val = is_val
 
         # query_data is for referencing
-        self.query_data = load_jsonl(self.data_path)
+        self.query_data = load_json(self.data_path)
 
         # ft is feature for query, sub and video
         self.bmr_env = lmdb.open(self.bmr_pred_path, readonly=True, create=False, max_readers=4096 * 8, readahead=False)
         self.bmr_pred = self.bmr_env.begin(buffers=True)
         
         self.desc_bert_h5 = h5py.File(config.query_path, "r")
-        # self.query_env = lmdb.open(self.query_ft_path, readonly=True, create=False, max_readers=4096 * 8, readahead=False)
+        # self.query_env = lmdb.open(config.query_path, readonly=True, create=False, max_readers=4096 * 8, readahead=False)
         # self.query_ft = self.query_env.begin(buffers=True)
         
-        self.sub_bert_env = lmdb.open(self.sub_ft_path, readonly=True, create=False, max_readers=4096 * 8, readahead=False)
+        self.sub_bert_env = lmdb.open(config.sub_path, readonly=True, create=False, max_readers=4096 * 8, readahead=False)
         self.sub_bert_ft = self.sub_bert_env.begin(buffers=True)
         
-        self.vid_env = lmdb.open(self.vid_ft_path, readonly=True, create=False, max_readers=4096 * 8, readahead=False)
+        self.vid_env = lmdb.open(config.vid_path, readonly=True, create=False, max_readers=4096 * 8, readahead=False)
         self.vid_ft = self.vid_env.begin(buffers=True)
         
         self.cctable_path = os.path.join(self.data_root, config.cctable_path)
         with open(self.cctable_path, 'r') as ftmp:
             self.cctable = json.load(ftmp)
 
-        self.vname_duration = load_json(config.video_duration_idx_path)
-        # vid_data = load_json(os.path.join(self.data_root, config.video_duration_idx_path))[self.type]
-        # self.vid_data = [{"vid_name": k, "duration": v[0]} for k, v in vid_data.items()]
-        # self.vid2idx = {k: v[1] for k, v in vid_data.items()}
-        # self.idx2vid = {v[1]:k for k, v in vid_data.items()}
+        # self.vname_duration = load_json(config.video_duration_idx_path)
+        vid_data = load_json(os.path.join(self.data_root, config.video_duration_idx_path))[self.type]
+        self.vid_data = [{"vid_name": k, "duration": v[0]} for k, v in vid_data.items()]
+        self.vid2idx = {k: v[1] for k, v in vid_data.items()}
+        self.idx2vid = {v[1]:k for k, v in vid_data.items()}
         self.bmr_allowance = bmr_allowance
         self.max_vcmr_video = max_vcmr_video
 
@@ -286,11 +284,12 @@ class SQDataset(Dataset):
 
 
     def get_query_feat(self, desc_id, token_id=1):
-        dump = self.query_ft.get(str(desc_id).encode())
-        with io.BytesIO(dump) as reader:
-            feat_dump = np.load(reader, allow_pickle=True)
-            query_feat = feat_dump['features'][:self.max_query_len]
-        feat_pad, feat_mask = self.padding_feature(query_feat, self.max_query_len)
+        # dump = self.query_ft.get(str(desc_id).encode())
+        # with io.BytesIO(dump) as reader:
+        #     feat_dump = np.load(reader, allow_pickle=True)
+        #     query_feat = feat_dump['features'][:self.max_query_len]
+        query_feat = self.desc_bert_h5[str(desc_id)][:self.max_query_len]
+        feat_pad, feat_mask = padding_feature(query_feat, self.max_query_len)
 
         tmp = dict()
         tmp["feat"] = feat_pad
@@ -328,7 +327,7 @@ class SQDataset(Dataset):
                 feat = self.get_vid_feat(video_name)
             else:
                 feat = self.get_sub_feat(video_name)
-            feat_pad, feat_mask = self.padding_feature(feat, self.max_vid_len)
+            feat_pad, feat_mask = padding_feature(feat, self.max_vid_len)
             nmr_bmr_feat_pad[index] = feat_pad
             nmr_bmr_feat_mask[index] = feat_mask
 

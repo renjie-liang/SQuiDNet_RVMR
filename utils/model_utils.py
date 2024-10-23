@@ -8,7 +8,7 @@ from torch.utils.data.dataloader import  default_collate
 N_Infinite = -1e10
 P_Infinite = 1e10
 
-def count_parameters(model, verbose=True):
+def count_parameters(model):
     """Count number of parameters in PyTorch model,
     References: https://discuss.pytorch.org/t/how-do-i-check-the-number-of-parameters-of-a-model/4325/7.
 
@@ -19,8 +19,6 @@ def count_parameters(model, verbose=True):
     """
     n_all = sum(p.numel() for p in model.parameters())
     n_trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    if verbose:
-        print("Parameter Count: all {:,d}; trainable {:,d}".format(n_all, n_trainable))
     return n_all, n_trainable
 
 def set_cuda(batch,device):
