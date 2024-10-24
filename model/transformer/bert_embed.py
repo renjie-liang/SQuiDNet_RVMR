@@ -3,18 +3,19 @@ Input Embedding Layers
 """
 import torch
 import torch.nn as nn
-import logging
+# import logging
 
+BertLayerNorm = torch.nn.LayerNorm
 
-logger = logging.getLogger(__name__)
-try:
-  import apex.normalization.fused_layer_norm.FusedLayerNorm as BertLayerNorm
-except (ImportError, AttributeError) as e:
-  logger.info(
-      "Better speed can be achieved with apex installed from "
-      "https://www.github.com/nvidia/apex ."
-  )
-  BertLayerNorm = torch.nn.LayerNorm
+# logger = logging.getLogger(__name__)
+# try:
+#   import apex.normalization.fused_layer_norm.FusedLayerNorm as BertLayerNorm
+# except (ImportError, AttributeError) as e:
+#   logger.info(
+#       "Better speed can be achieved with apex installed from "
+#       "https://www.github.com/nvidia/apex ."
+#   )
+#   BertLayerNorm = torch.nn.LayerNorm
 
 
 class BertEmbeddings(nn.Module):
@@ -47,7 +48,7 @@ class BertEmbeddings(nn.Module):
             position_ids = self.position_ids[:, :seq_length]
 
         if token_type_ids is None:
-            token_type_ids = torch.zeros(input_shape, dtype=torch.long, device=self.position_ids.device)
+            token_type_ids = torch.zeros(input_shape, dtype=self.long, device=self.position_ids.device)
 
         if inputs_embeds is None:
             inputs_embeds = self.word_embeddings(input_ids)

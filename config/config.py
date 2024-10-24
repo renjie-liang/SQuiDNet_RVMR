@@ -87,7 +87,7 @@ class SharedOpt(object):
         self.parser.add_argument("--exp_id", type=str, default=None, help="id of this run, required at training")
 
 
-        self.parser.add_argument("--eval_interval_float", type=float, default=1.0, help="eval times during each epoch")
+        self.parser.add_argument("--eval_folds", type=float, default=1.0, help="eval times during each epoch")
         self.parser.add_argument("--log_interval", type=int, default=100)
 
 

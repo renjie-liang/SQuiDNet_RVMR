@@ -3,7 +3,7 @@ python train.py \
     --exp moment_video \
     --model_config config/model_config.json \
     --data_config config/data_config_tvrr.json \
-    --batch 16 \
+    --batch 32 \
     --eval_query_batch 5 \
     --task VCMR \
     --eval_tasks VCMR SVMR VR \
@@ -11,5 +11,4 @@ python train.py \
     --loss_measure moment_video \
     --num_workers 8 \
     --exp_id debug \
-    --deepspeed_config config/deepspeed_config.json \
-    ${@:1}
+    --eval_folds 1

@@ -56,6 +56,23 @@ def set_cuda(batch,device):
             batch[key] = value.cuda(non_blocking=True, device=device)
     return batch
 
+
+def set_cuda_half(batch,device):
+    for key, value in batch.items():
+        if isinstance(value, dict):
+            for _key, _value in value.items():
+                batch[key][_key] = _value.cuda(non_blocking=True, device=device).half()
+        elif isinstance(value, (list,)):
+            for i in range(len(value)):
+                batch[key][i] = value[i].cuda(non_blocking=True, device=device).half()
+        else:
+            batch[key] = value.cuda(non_blocking=True, device=device).half()
+    return batch
+
+
+            
+
+
 def mask_logits(target, mask):
     return target * mask + (1 - mask) * N_Infinite
 

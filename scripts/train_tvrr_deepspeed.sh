@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-CUDA_VISIBLE_DEVICES=5,7 deepspeed --num_gpus=2 train.py \
+CUDA_VISIBLE_DEVICES=5 deepspeed --num_gpus=1 train_deepspeed.py \
                     --exp moment_video \
                     --model_config config/model_config.json \
                     --data_config config/data_config_tvrr.json \

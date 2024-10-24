@@ -16,7 +16,7 @@ from loader import SQDataset, SQTrainDataset
 from inference import eval_epoch
 from optim.adamw import AdamW
 from utils.basic_utils import AverageMeter,load_config, get_logger, rm_key_from_odict
-from utils.model_utils import count_parameters, set_cuda, vcmr_collate, set_cuda_local_rank
+from utils.model_utils import count_parameters, set_cuda, vcmr_collate, set_cuda_local_rank, set_cuda_half
 
 
 
@@ -52,12 +52,9 @@ def train(model, train_dataset, val_dataset, args, logger):
     # optimizer = None
 
 
-    deepspeed.init_distributed()
-    local_rank = int(os.getenv('LOCAL_RANK', '0'))
-    torch.cuda.set_device(local_rank)
 
-    model = model.to(local_rank)
 
+    model = model.to(args.device)
     model_engine, optimizer, _, _ = deepspeed.initialize(config=args.deepspeed_config,
                                                          model=model,
                                                          model_parameters=model.parameters())
@@ -65,7 +62,7 @@ def train(model, train_dataset, val_dataset, args, logger):
     prev_best_score = 0.
     es_cnt = 0
     start_epoch = 0 if args.no_eval_untrained else -1
-    eval_interval = len(train_loader) // args.eval_interval_float
+    eval_interval = len(train_loader) // args.eval_folds
     eval_tasks = args.eval_tasks 
     save_submission_filename = "latest_{}_{}_predictions_{}.json".format(args.data_name, args.eval_type, "_".join(eval_tasks))
 
@@ -77,7 +74,9 @@ def train(model, train_dataset, val_dataset, args, logger):
         for step, batch in tqdm(enumerate(train_loader), desc=f"Training", total=num_training):
             global_step = epoch * num_training + step + 1
             # continue
-            model_inputs = set_cuda_local_rank(batch["model_inputs"], local_rank)
+            # model_inputs = set_cuda_half(batch["model_inputs"], args.device)
+            model_inputs = set_cuda(batch["model_inputs"], args.device)
+            # model_inputs = set_cuda_local_rank(batch["model_inputs"], local_rank)
             loss = model_engine(model_inputs)
             model_engine.backward(loss)
             model_engine.step()

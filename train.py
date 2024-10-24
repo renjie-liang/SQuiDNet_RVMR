@@ -61,7 +61,7 @@ def train(model, train_dataset, val_dataset, args, logger):
     prev_best_score = 0.
     es_cnt = 0
     start_epoch = 0 if args.no_eval_untrained else -1
-    eval_step = len(train_loader) // args.eval_interval_float
+    eval_step = len(train_loader) // args.eval_folds
     eval_tasks = args.eval_tasks 
     save_submission_filename = "latest_{}_{}_predictions_{}.json".format(args.data_name, args.eval_type, "_".join(eval_tasks))
 
@@ -73,21 +73,18 @@ def train(model, train_dataset, val_dataset, args, logger):
             global_step = epoch * num_training + step + 1
             # continue
             model_inputs = set_cuda(batch["model_inputs"], args.device)
-            loss, loss_dict = model(model_inputs)
+            loss = model(model_inputs)
             optimizer.zero_grad()
             loss.backward()
             loss_meter.update(loss.item())
-            if args.grad_clip != -1:
-                total_norm = nn.utils.clip_grad_norm_(model.parameters(), args.grad_clip)
-                if total_norm > args.grad_clip:
-                    logger.info("clipping gradient: {} with coefficient as {}".format(total_norm, args.grad_clip / total_norm))
-                optimizer.step()
+            optimizer.step()
+
             if step % args.log_interval == 0:
                 logger.info(f"EPOCH {epoch}/{args.n_epoch} | STEP: {step}|{len(train_loader)} | Loss: {loss_meter.avg:.4f}")
                 loss_meter.reset()
                 for i in range(torch.cuda.device_count()):
-                    logger.info(f"Memory Allocated on GPU {i}: {torch.cuda.memory_allocated(i) / 1024**3:.2f} GB")
-                    logger.info(f"Memory Cached on GPU {i}: {torch.cuda.memory_reserved(i) / 1024**3:.2f} GB")
+                    print(f"Memory Allocated on GPU {i}: {torch.cuda.memory_allocated(i) / 1024**3:.2f} GB")
+                    print(f"Memory Cached on GPU {i}: {torch.cuda.memory_reserved(i) / 1024**3:.2f} GB")
 
 
             if global_step % eval_step == 0 or step == len(train_loader):
