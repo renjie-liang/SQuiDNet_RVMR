@@ -50,7 +50,7 @@ def generate_min_max_mask(array_shape, min_l, max_l):
     final_prob_mask = mask_triu * mask_triu_reversed
     return final_prob_mask
 
-def compute_query2vid(model, eval_dataset, opt, max_before_nms=200, max_vcmr_video=100, tasks=("SVMR",)):
+def compute_query2vid(model, eval_dataset, args, max_before_nms=200, max_vcmr_video=100, tasks=("SVMR",)):
     is_vr = "VR" in tasks
     is_vcmr = "VCMR" in tasks
     is_svmr = "SVMR" in tasks
@@ -58,10 +58,10 @@ def compute_query2vid(model, eval_dataset, opt, max_before_nms=200, max_vcmr_vid
     vid2idx = eval_dataset.vid2idx
 
     model.eval()
-    query_eval_loader = DataLoader(eval_dataset, collate_fn=vcmr_collate, batch_size=opt.eval_query_batch, num_workers=opt.num_workers, shuffle=False, pin_memory=True)
+    query_eval_loader = DataLoader(eval_dataset, collate_fn=vcmr_collate, batch_size=args.eval_query_batch, num_workers=args.num_workers, shuffle=False, pin_memory=True)
 
     n_total_query = len(eval_dataset)
-    query_batch_size = opt.eval_query_batch
+    query_batch_size = args.eval_query_batch
 
     if is_vcmr:
         flat_st_ed_scores_sorted_indices = np.empty((n_total_query, max_before_nms), dtype=int)
@@ -70,21 +70,21 @@ def compute_query2vid(model, eval_dataset, opt, max_before_nms=200, max_vcmr_vid
         sorted_q2c_indices = np.empty((n_total_query, max_vcmr_video), dtype=int)
         sorted_q2c_scores = np.empty((n_total_query, max_vcmr_video), dtype=np.float32)
     if is_svmr:
-        svmr_gt_st_probs = np.zeros((n_total_query, opt.max_vid_len), dtype=np.float32)
-        svmr_gt_ed_probs = np.zeros((n_total_query, opt.max_vid_len), dtype=np.float32)
+        svmr_gt_st_probs = np.zeros((n_total_query, args.max_vid_len), dtype=np.float32)
+        svmr_gt_ed_probs = np.zeros((n_total_query, args.max_vid_len), dtype=np.float32)
 
     ann_info = []
     for idx, batch in tqdm(enumerate(query_eval_loader), desc="Computing q embedding", total=len(query_eval_loader)):
 
         ann_info.extend(batch["annotation"])
-        model_inputs = set_cuda(batch["model_inputs"], opt.device)
+        model_inputs = set_cuda(batch["model_inputs"], args.device)
 
-        if opt.device.type == "cuda":
-            model_inputs = set_cuda(batch["model_inputs"], opt.device)
+        if args.device.type == "cuda":
+            model_inputs = set_cuda(batch["model_inputs"], args.device)
         else:
             model_inputs = batch["model_inputs"]
 
-        if len(opt.device_ids) > 1:
+        if len(args.device_ids) > 1:
             video_similarity_score, begin_score_distribution, end_score_distribution = model.module.get_pred_from_raw_query(model_inputs)
         else:
             video_similarity_score, begin_score_distribution, end_score_distribution = model.get_pred_from_raw_query(model_inputs)
@@ -118,13 +118,13 @@ def compute_query2vid(model, eval_dataset, opt, max_before_nms=200, max_vcmr_vid
         _st_probs = F.softmax(_vcmr_st_prob, dim=-1)  # (query_batch, video_corpus, vid_len)
         _ed_probs = F.softmax(_vcmr_ed_prob, dim=-1)
 
-        row_indices = torch.arange(0, len(_st_probs), device=opt.device).unsqueeze(1)
+        row_indices = torch.arange(0, len(_st_probs), device=args.device).unsqueeze(1)
         _st_probs = _st_probs[row_indices, _sorted_q2c_indices] 
         _ed_probs = _ed_probs[row_indices, _sorted_q2c_indices]
 
         _st_ed_scores = torch.einsum("qvm,qv,qvn->qvmn", _st_probs, _sorted_q2c_scores, _ed_probs)
 
-        valid_prob_mask = generate_min_max_mask(_st_ed_scores.shape, min_l=opt.min_pred_l, max_l=opt.max_pred_l)
+        valid_prob_mask = generate_min_max_mask(_st_ed_scores.shape, min_l=args.min_pred_l, max_l=args.max_pred_l)
 
         _st_ed_scores *= torch.from_numpy(valid_prob_mask).to(_st_ed_scores.device)
 
@@ -149,13 +149,13 @@ def compute_query2vid(model, eval_dataset, opt, max_before_nms=200, max_vcmr_vid
 
     svmr_res = []
     if is_svmr:
-        svmr_res = svmr_st_ed_probs(svmr_gt_st_probs, svmr_gt_ed_probs, ann_info, vid2idx, min_pred_l=opt.min_pred_l, max_pred_l=opt.max_pred_l, max_before_nms=max_before_nms)
+        svmr_res = svmr_st_ed_probs(svmr_gt_st_probs, svmr_gt_ed_probs, ann_info, vid2idx, min_pred_l=args.min_pred_l, max_pred_l=args.max_pred_l, max_before_nms=max_before_nms)
 
 
     vcmr_res = []
     if is_vcmr:
         for i, (_flat_st_ed_scores_sorted_indices, _flat_st_ed_sorted_scores) in tqdm(enumerate(zip(flat_st_ed_scores_sorted_indices, flat_st_ed_sorted_scores)),desc="[VCMR]", total=n_total_query):
-            video_indices_local, pred_st_indices, pred_ed_indices = np.unravel_index(_flat_st_ed_scores_sorted_indices, shape=(max_vcmr_video, opt.max_vid_len, opt.max_vid_len))
+            video_indices_local, pred_st_indices, pred_ed_indices = np.unravel_index(_flat_st_ed_scores_sorted_indices, shape=(max_vcmr_video, args.max_vid_len, args.max_vid_len))
             video_indices = sorted_q2c_indices[i, video_indices_local]
 
             pred_st_in_seconds = pred_st_indices.astype(np.float32) * 1.5
@@ -172,10 +172,10 @@ def compute_query2vid(model, eval_dataset, opt, max_before_nms=200, max_vcmr_vid
     return {k: v for k, v in res.items() if len(v) != 0}
 
 
-def get_eval_res(model, eval_dataset, opt, tasks):
+def get_eval_res(model, eval_dataset, args, tasks):
     """compute and save query and video proposal embeddings"""
 
-    eval_res = compute_query2vid(model, eval_dataset, opt, max_before_nms=opt.max_before_nms, max_vcmr_video=opt.max_vcmr_video, tasks=tasks)
+    eval_res = compute_query2vid(model, eval_dataset, args, max_before_nms=args.max_before_nms, max_vcmr_video=args.max_vcmr_video, tasks=tasks)
     eval_res["vid2idx"] = eval_dataset.vid2idx
     return eval_res
 
@@ -186,19 +186,19 @@ POST_PROCESSING_MMS_FUNC = {
 }
 
 
-def eval_epoch(model, eval_dataset, opt, save_submission_filename, tasks=("VCMR","SVMR","VR"), max_after_nms=100):
+def eval_epoch(model, eval_dataset, args, save_submission_filename, tasks=("VCMR","SVMR","VR"), max_after_nms=100):
     model.eval()
     logger.info("Computing scores")
-    eval_submission_raw = get_eval_res(model, eval_dataset, opt, tasks)
+    eval_submission_raw = get_eval_res(model, eval_dataset, args, tasks)
 
     IOU_THDS = (0.5, 0.7)
     logger.info("Saving/Evaluating before nms results")
-    submission_path = os.path.join(opt.results_dir, save_submission_filename)
+    submission_path = os.path.join(args.results_dir, save_submission_filename)
     eval_submission = get_submission_top_n(eval_submission_raw, top_n=max_after_nms)
     # save_json(eval_submission, submission_path)
 
-    if opt.eval_type == "val":  # since test_public has no GT
-        metrics = eval_retrieval(eval_submission, eval_dataset.query_data, iou_thds=IOU_THDS, match_number=True, verbose=False, use_desc_type=opt.data_name == "tvr")
+    if args.eval_type == "val":  # since test_public has no GT
+        metrics = eval_retrieval(eval_submission, eval_dataset.query_data, iou_thds=IOU_THDS, match_number=True, verbose=False, use_desc_type=args.data_name == "tvr")
         save_metrics_path = submission_path.replace(".json", "_metrics.json")
         save_json(metrics, save_metrics_path, save_pretty=True, sort_keys=False)
         latest_file_paths = [submission_path, save_metrics_path]
@@ -207,19 +207,19 @@ def eval_epoch(model, eval_dataset, opt, save_submission_filename, tasks=("VCMR"
         latest_file_paths = [submission_path, ]
 
 
-    if opt.nms_thd != -1:
-        logger.info("Performing nms with nms_thd {}".format(opt.nms_thd))
+    if args.nms_thd != -1:
+        logger.info("Performing nms with nms_thd {}".format(args.nms_thd))
         eval_submission_after_nms = dict(vid2idx=eval_submission_raw["vid2idx"])
         if "VR" in eval_submission_raw:
             eval_submission_after_nms["VR"] = eval_submission_raw["VR"]
         for k, nms_func in POST_PROCESSING_MMS_FUNC.items():
             if k in eval_submission_raw:
-                eval_submission_after_nms[k] = nms_func(eval_submission_raw[k], nms_thd=opt.nms_thd, max_before_nms=opt.max_before_nms, max_after_nms=max_after_nms)
+                eval_submission_after_nms[k] = nms_func(eval_submission_raw[k], nms_thd=args.nms_thd, max_before_nms=args.max_before_nms, max_after_nms=max_after_nms)
 
         logger.info("Saving/Evaluating nms results")
-        submission_nms_path = submission_path.replace(".json", "_nms_thd_{}.json".format(opt.nms_thd))
+        submission_nms_path = submission_path.replace(".json", "_nms_thd_{}.json".format(args.nms_thd))
         # save_json(eval_submission_after_nms, submission_nms_path)
-        if opt.eval_type == "val":
+        if args.eval_type == "val":
             metrics_nms = eval_retrieval(eval_submission_after_nms, eval_dataset.query_data, iou_thds=IOU_THDS, match_number=True, verbose=False)
             save_metrics_nms_path = submission_nms_path.replace(".json", "_metrics.json")
             # save_json(metrics_nms, save_metrics_nms_path, save_pretty=True, sort_keys=False)
@@ -232,38 +232,38 @@ def eval_epoch(model, eval_dataset, opt, save_submission_filename, tasks=("VCMR"
     return metrics, metrics_nms, latest_file_paths
 
 
-def setup_model(opt):
+def setup_model(args):
     """Load model from checkpoint and move to specified device"""
-    checkpoint = torch.load(opt.ckpt_filepath)
+    checkpoint = torch.load(args.ckpt_filepath)
     loaded_model_cfg = checkpoint["model_cfg"]
-    model = SQuiDNet(loaded_model_cfg, vid_dim=opt.vid_dim, text_dim=opt.text_dim, hidden_dim=opt.hidden_dim, loss_measure=opt.loss_measure)
+    model = SQuiDNet(loaded_model_cfg, vid_dim=args.vid_dim, text_dim=args.text_dim, hidden_dim=args.hidden_dim, loss_measure=args.loss_measure)
     model.load_state_dict(checkpoint["model"])
-    logger.info("Loaded model saved at epoch {} from checkpoint: {}".format(checkpoint["epoch"], opt.ckpt_filepath))
+    logger.info("Loaded model saved at epoch {} from checkpoint: {}".format(checkpoint["epoch"], args.ckpt_filepath))
 
-    if opt.device.type == "cuda":
+    if args.device.type == "cuda":
         logger.info("CUDA enabled.")
-        model.to(opt.device)
-        assert len(opt.device_ids) == 1
-        if len(opt.device_ids) > 1:
-            model = torch.nn.DataParallel(model, device_ids=opt.device_ids)  # use multi GPU
+        model.to(args.device)
+        assert len(args.device_ids) == 1
+        if len(args.device_ids) > 1:
+            model = torch.nn.DataParallel(model, device_ids=args.device_ids)  # use multi GPU
     return model
 
 
 def start_inference():
     logger.info("Setup config, data and model...")
-    opt = TestOpt().parse()
+    args = TestOpt().parse()
     cudnn.benchmark = False
     cudnn.deterministic = True
 
-    data_config = load_config(opt.data_config)
-    eval_dataset = SQDataset(data_type=opt.eval_type, config=data_config, max_vid_len=opt.max_vid_len, max_query_len=opt.max_query_len, is_val=True, max_vcmr_video=opt.max_vcmr_video)
+    data_config = load_config(args.data_config)
+    eval_dataset = SQDataset(data_type=args.eval_type, config=data_config, max_vid_len=args.max_vid_len, max_query_len=args.max_query_len, is_val=True, max_vcmr_video=args.max_vcmr_video)
 
-    model = setup_model(opt)
-    save_submission_filename = "inference_{}_{}_{}_predictions_{}.json".format(opt.data_name, opt.eval_type, opt.eval_id, "_".join(opt.tasks))
+    model = setup_model(args)
+    save_submission_filename = "inference_{}_{}_{}_predictions_{}.json".format(args.data_name, args.eval_type, args.eval_id, "_".join(args.tasks))
     print(save_submission_filename)
     logger.info("Starting inference...")
     with torch.no_grad():
-        metrics_no_nms, metrics_nms, latest_file_paths = eval_epoch(model, eval_dataset, opt, save_submission_filename, tasks=opt.tasks, max_after_nms=100)
+        metrics_no_nms, metrics_nms, latest_file_paths = eval_epoch(model, eval_dataset, args, save_submission_filename, tasks=args.tasks, max_after_nms=100)
     logger.info("metrics_no_nms \n{}".format(pprint.pformat(metrics_no_nms, indent=4)))
     logger.info("metrics_nms \n{}".format(pprint.pformat(metrics_nms, indent=4)))
 

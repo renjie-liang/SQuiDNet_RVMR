@@ -9,6 +9,7 @@ python train.py \
     --eval_tasks VCMR SVMR VR \
     --max_vcmr_video 10 \
     --loss_measure moment_video \
-    --num_workers 8\
+    --num_workers 8 \
     --exp_id debug \
+    --deepspeed_config config/deepspeed_config.json \
     ${@:1}

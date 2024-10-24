@@ -144,8 +144,8 @@ class SQuiDNet(nn.Module):
 
 
         loss = moment_debiasing_loss + vid_loss
-        return loss, {"moment_debiasing_loss": float(moment_debiasing_loss), "video_prediction_loss": float(vid_loss), "loss_total": float(loss)}
-        #return loss
+        # return loss, {"moment_debiasing_loss": float(moment_debiasing_loss), "video_prediction_loss": float(vid_loss), "loss_total": float(loss)}
+        return loss
 
 
 

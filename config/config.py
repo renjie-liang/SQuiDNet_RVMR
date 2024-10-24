@@ -25,7 +25,7 @@ class SharedOpt(object):
 
     def __init__(self):
         self.parser = argparse.ArgumentParser()
-        self.opt = None
+        self.args = None
 
     def parser_init(self):
         self.parser.add_argument("--data_name", type=str, default="tvr", choices=["tvr", "didemo"])
@@ -79,57 +79,35 @@ class SharedOpt(object):
         self.parser.add_argument("--max_vcmr_video", type=int, default=10, help="ranking in top-max_vcmr_video")
         self.parser.add_argument("--nms_thd", type=float, default=-1, help="optinally use non-maximum suppression")
         # can use config files
-        self.parser.add_argument('--config', help='JSON config files')
-        
+        self.parser.add_argument('--config', help='JSON config file')
+        self.parser.add_argument('--deepspeed_config', help='deepspeed JSON config file')
+        self.parser.add_argument('--local_rank', type=int, default=-1, help='local rank passed from distributed launcher')
+                
         self.parser.add_argument("--results_path", type=str, default="results")
         self.parser.add_argument("--exp_id", type=str, default=None, help="id of this run, required at training")
 
 
-        self.parser.add_argument("--eval_num_per_epoch", type=float, default=1.0, help="eval times during each epoch")
-        self.parser.add_argument("--log_step", type=int, default=100)
+        self.parser.add_argument("--eval_interval_float", type=float, default=1.0, help="eval times during each epoch")
+        self.parser.add_argument("--log_interval", type=int, default=100)
 
-    def display_save(self, opt):
-        args = vars(opt)
-        print("___Opts representation___\n{}\n___".format(pprint.pformat({str(k): str(v) for k, v in sorted(args.items())}, indent=4)))
-
-        # Save settings
-        if not isinstance(self, TestOpt):
-            option_file_path = os.path.join(opt.results_dir, "opt.json")  # not yaml file indeed
-            save_json(args, option_file_path, save_pretty=True)
 
 
     def parse(self):
         self.parser_init()
-        opt = parse_with_config(self.parser)
+        args = parse_with_config(self.parser)
 
-        if isinstance(self, TestOpt):
+        args.results_dir = os.path.join(args.results_root,"-".join([args.exp, time.strftime("%Y_%m_%d_%H_%M_%S")]))
+        mkdirp(args.results_dir)
 
-            # modify model_dir to absolute path
-            opt.model_dir = os.path.join("results", opt.model_dir)
-
-            saved_options = load_json(os.path.join(opt.model_dir, "opt.json"))
-            for arg in saved_options:  # use saved options to overwrite all SharedOpt args.
-                if arg not in ["results_root", "nms_thd", "debug", "dataset_config", "model_config","device",
-                               "eval_type", "eval_query_batch", "device_ids", "max_vcmr_video","max_pred_l", "min_pred_l"]:
-                    setattr(opt, arg, saved_options[arg])
-        else:
-            opt.results_dir = os.path.join(opt.results_root,"-".join([opt.exp, time.strftime("%Y_%m_%d_%H_%M_%S")]))
-            mkdirp(opt.results_dir)
-            # save a copy of current code
-            code_dir = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
-            code_zip_filename = os.path.join(opt.results_dir, "code.zip")
-            make_zipfile(code_dir, code_zip_filename, enclosing_dir="code", exclude_dirs_substring="results", exclude_dirs=["condor","data","results", "debug_results", "__pycache__"], exclude_extensions=[".pyc", ".ipynb", ".swap"],)
-
-        self.display_save(opt)
-
-        assert opt.task in opt.eval_tasks
-        opt.ckpt_filepath = os.path.join(opt.results_dir, "model.ckpt")
-        opt.train_log_filepath = os.path.join(opt.results_dir, "train.log.txt")
-        opt.eval_log_filepath = os.path.join(opt.results_dir, "eval.log.txt")
-        opt.tensorboard_log_dir = os.path.join(opt.results_dir, "tensorboard_log")
-        opt.device = torch.device("cuda:%d" % opt.device_ids[0] if opt.device >= 0 else "cpu")
-        self.opt = opt
-        return opt
+        assert args.task in args.eval_tasks
+        args.ckpt_filepath = os.path.join(args.results_dir, "model.ckpt")
+        args.train_log_filepath = os.path.join(args.results_dir, "train.log.txt")
+        args.eval_log_filepath = os.path.join(args.results_dir, "eval.log.txt")
+        args.tensorboard_log_dir = os.path.join(args.results_dir, "tensorboard_log")
+        # args.device = torch.device("cuda:%d" % args.device_ids[0] if args.device >= 0 else "cpu")
+        args.device = torch.device("cuda" if args.device >= 0 else "cpu")
+        self.args = args
+        return args
 
 
 class TestOpt(SharedOpt):

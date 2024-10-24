@@ -204,3 +204,7 @@ def get_logger(dir, tile):
     logger.addHandler(fhlr)
     return logger
 
+
+from collections import OrderedDict
+def rm_key_from_odict(odict_obj, rm_suffix):
+    return OrderedDict([(k, v) for k, v in odict_obj.items() if rm_suffix not in k])

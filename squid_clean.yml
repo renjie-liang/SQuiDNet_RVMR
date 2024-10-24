@@ -9,3 +9,4 @@ dependencies:
     - easydict
     - msgpack
     - lmdb
+    - deepspeed
