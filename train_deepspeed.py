@@ -113,7 +113,7 @@ def train(model, train_dataset, val_dataset, args, logger):
 
 def train_squid():
     args = SharedOpt().parse()
-    logger = get_logger(args.results_path, args.exp_id)
+    logger = get_logger(args.results_dir, args.exp)
 
     logger.info("setup args configuration...")
     # Fix seed

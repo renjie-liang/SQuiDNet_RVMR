@@ -7,4 +7,4 @@ python train.py \
     --max_vcmr_video 10 \
     --loss_measure moment_video \
     --num_workers 8 \
-    --eval_folds 1
+    --eval_folds 0.1

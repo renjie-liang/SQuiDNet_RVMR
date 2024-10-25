@@ -4,7 +4,9 @@ from utils.basic_utils import load_json, save_json
 from tqdm import tqdm
 
 # Load query data
-train_data_path = "./data/TVR-Ranking/train_top01_noun_predicate.json"
+train_data_path = "./data/TVR-Ranking/train_top01_noun_verb.json"
+# train_data_path = "./data/TVR-Ranking/test_noun_verb.json"
+# train_data_path = "./data/TVR-Ranking/val_noun_verb.json"
 train_bmr_path = "./data/TVR-Ranking/new_bmr_pred_lmdb"
 
 
@@ -36,4 +38,10 @@ bmr_env.close()
 print(len(query_data))
 new_anno = [ i for i in query_data if i['query_id'] not in none_list]
 print(len(new_anno))
-save_json(new_anno, 'data/TVR-Ranking/train_top01_noun_predicate_cleaned.json')
+save_json(new_anno, 'data/TVR-Ranking/train_top01_noun_verb_cleaned.json')
+# save_json(new_anno, 'data/TVR-Ranking/test_noun_verb_cleaned.json')
+# save_json(new_anno, 'data/TVR-Ranking/val_noun_verb_cleaned.json')
+
+### Train: 69317 -> 69063
+### Test: 2781 -> 2768
+### Val: 500 -> 497

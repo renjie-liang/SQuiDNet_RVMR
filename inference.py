@@ -56,7 +56,6 @@ def compute_query2vid(model, eval_dataset, args, max_before_nms=200, max_vcmr_vi
     is_svmr = "SVMR" in tasks
 
     vid2idx = eval_dataset.vid2idx
-
     model.eval()
     query_eval_loader = DataLoader(eval_dataset, collate_fn=vcmr_collate, batch_size=args.eval_query_batch, num_workers=args.num_workers, shuffle=False, pin_memory=True)
 
@@ -89,31 +88,31 @@ def compute_query2vid(model, eval_dataset, args, max_before_nms=200, max_vcmr_vi
         else:
             video_similarity_score, begin_score_distribution, end_score_distribution = model.get_pred_from_raw_query(model_inputs)
 
-        if is_svmr:
-            _svmr_st_probs = begin_score_distribution[:, 0]
-            _svmr_ed_probs = end_score_distribution[:, 0]
+        # if is_svmr:
+        #     _svmr_st_probs = begin_score_distribution[:, 0]
+        #     _svmr_ed_probs = end_score_distribution[:, 0]
 
-            _svmr_st_probs = F.softmax(_svmr_st_probs, dim=-1)
-            _svmr_ed_probs = F.softmax(_svmr_ed_probs, dim=-1)
+        #     _svmr_st_probs = F.softmax(_svmr_st_probs, dim=-1)
+        #     _svmr_ed_probs = F.softmax(_svmr_ed_probs, dim=-1)
 
-            svmr_gt_st_probs[idx*query_batch_size : (idx+1)*query_batch_size] = _svmr_st_probs.cpu().numpy()
-            svmr_gt_ed_probs[idx*query_batch_size : (idx+1)*query_batch_size] = _svmr_ed_probs.cpu().numpy()
+        #     svmr_gt_st_probs[idx*query_batch_size : (idx+1)*query_batch_size] = _svmr_st_probs.cpu().numpy()
+        #     svmr_gt_ed_probs[idx*query_batch_size : (idx+1)*query_batch_size] = _svmr_ed_probs.cpu().numpy()
 
         _vcmr_st_prob = begin_score_distribution[:, 1:]
         _vcmr_ed_prob = end_score_distribution[:, 1:]
 
-        if not (is_vr or is_vcmr):
-            continue
+        # if not (is_vr or is_vcmr):
+        #     continue
         video_similarity_score = video_similarity_score[:, 1:] # first element holds ground-truth information
         _query_context_scores = torch.softmax(video_similarity_score,dim=1)
         _sorted_q2c_scores, _sorted_q2c_indices = torch.topk(_query_context_scores, max_vcmr_video, dim=1, largest=True)
 
-        if is_vr:
-            sorted_q2c_indices[idx*query_batch_size : (idx+1)*query_batch_size] = _sorted_q2c_indices.cpu().numpy()
-            sorted_q2c_scores[idx*query_batch_size : (idx+1)*query_batch_size] = _sorted_q2c_scores.cpu().numpy()
+        # if is_vr:
+        #     sorted_q2c_indices[idx*query_batch_size : (idx+1)*query_batch_size] = _sorted_q2c_indices.cpu().numpy()
+        #     sorted_q2c_scores[idx*query_batch_size : (idx+1)*query_batch_size] = _sorted_q2c_scores.cpu().numpy()
 
-        if not is_vcmr:
-            continue
+        # if not is_vcmr:
+        #     continue
 
         _st_probs = F.softmax(_vcmr_st_prob, dim=-1)  # (query_batch, video_corpus, vid_len)
         _ed_probs = F.softmax(_vcmr_ed_prob, dim=-1)

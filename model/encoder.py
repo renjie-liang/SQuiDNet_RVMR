@@ -101,7 +101,6 @@ class VSMMApool(nn.Module):
 
     def VSMMA(self, batch):
         video_output = dict()
-
         if len(batch["vid"]["feat"].size()) == 4:
             bsz, num_video = batch["vid"]["feat"].size()[:2]
             for key in batch.keys():

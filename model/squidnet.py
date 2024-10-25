@@ -87,7 +87,6 @@ class SQuiDNet(nn.Module):
         return query_feat, query_mask, tot_nmr_bmr_num
 
     def get_pred_from_raw_query(self, batch):
-
         # get query feature and subtitle-matched video feature
         query_feature = self.MMAencoder.query_enc(batch)
         vsMMA_feature = self.MMAencoder.VSMMA(batch)

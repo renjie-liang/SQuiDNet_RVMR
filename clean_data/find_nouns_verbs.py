@@ -39,11 +39,13 @@ def find_nouns_verbs(sentence):
 
 
 
-data = load_json("data/TVR-Ranking/train_top01.json")
+# data = load_json("data/TVR-Ranking/train_top01.json")
+data = load_json("data/TVR-Ranking/test.json")
 
 for record in tqdm(data):
     query = record['query']
     nouns, verbs = find_nouns_verbs(query)
     record.update({'noun': nouns, 'verb': verbs})
 
-save_json(data, "data/TVR-Ranking/train_top01_noun_predicate.json")
+# save_json(data, "data/TVR-Ranking/train_top01_noun_predicate.json")
+save_json(data, "data/TVR-Ranking/test_noun_verb.json")

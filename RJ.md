@@ -1,5 +1,7 @@
 srun --partition=gpu --gres=gpu:1 --nodes=1 --cpus-per-task=8 --mem=100gb --time=01:00:00 --account=bianjiang --qos=bianjiang --reservation=bianjiang --pty bash -i
 micromamba activate squid
+sh scripts/train_tvrr_top01.sh 
+
 sh scripts/train_tvrr_deepspeed.sh 
 sh scripts/train_tvrr.sh 
 sh scripts/train.sh 
@@ -62,3 +64,28 @@ vsMMA_feature = self.MMAencoder.VSMMA(vid_features=batch["vid"]["feat"],
                                         text_token_type_ids=batch["sub"]["feat_token_id"],
                                         text_attention_mask=batch["sub"]["feat_mask"]
 
+
+
+## Inference
+
+eval_res.keys()
+dict_keys(['VCMR', 'SVMR', 'VR'])
+
+(Pdb) eval_res['VCMR'][0]
+{'desc_id': 90200, 'desc': 'Phoebe puts one of her ponytails in her mouth.', 'predictions': [[20627, 16.5, 27.0, 0.00036907775211147964],
+
+
+Step 1: select 10 videos
+Step 2: select 100 prediction from 10 videos.
+
+
+Therefore, we have two options,
+Option 1: predict the moments within all videos.
+Option 2: supposed the candidate videos were found by the first stage (BMR), then predict the moments from the 1  0 candidate videos.
+
+
+
+
+torch.Size([32, 16, 100, 4352])
+32 is the ?
+16 ?

@@ -30,7 +30,7 @@ class SharedOpt(object):
     def parser_init(self):
         self.parser.add_argument("--data_name", type=str, default="tvr", choices=["tvr", "didemo"])
         self.parser.add_argument("--eval_type", type=str, default="val", help="should be used for loss calculation and prediction")
-        self.parser.add_argument("--results_root", type=str, default="results")
+        self.parser.add_argument("--results_dir", type=str, default="results")
         self.parser.add_argument("--exp", type=str, default=None, help="experiment name")
         self.parser.add_argument("--seed", type=int, default=2018, help="random seed")
         self.parser.add_argument("--device", type=int, default=0, help="0 means gpu id 0")
@@ -41,12 +41,9 @@ class SharedOpt(object):
         self.parser.add_argument("--lr", type=float, default=1e-4, help="learning rate")
         self.parser.add_argument("--lr_warmup_proportion", type=float, default=0.01, help="proportion to perform warm up of linear learning rate""0.1 = 10% of training.")
         self.parser.add_argument("--wd", type=float, default=0.01, help="weight decay")
-        self.parser.add_argument("--n_epoch", type=int, default=20, help="number of epochs")
+        self.parser.add_argument("--n_epoch", type=int, default=4000, help="number of epochs")
         self.parser.add_argument("--max_es_cnt", type=int, default=3,help="number of epochs to early stop, -1: no use of early stop")
-        self.parser.add_argument("--task", type=str, default="VCMR", choices=["VCMR", "SVMR", "VR"], help="Use metric for task among VCMR, SVMR and VR")
-        self.parser.add_argument("--eval_tasks", type=str, nargs="+", default=["VCMR", "SVMR", "VR"], choices=["VCMR", "SVMR", "VR"], help="evaluate tasks")
         self.parser.add_argument("--batch", type=int, default=32, help="batch size")
-        self.parser.add_argument("--eval_query_batch", type=int, default=8,help="batch size at inference per query")
         self.parser.add_argument("--no_eval_untrained", action="store_true", help="Evaluate for debug")
         self.parser.add_argument("--grad_clip", type=float, default=-1, help="perform gradient clip, -1: disable")
         self.parser.add_argument("--eval_epoch_num", type=int, default=1, help="eval_epoch_num")
@@ -83,27 +80,19 @@ class SharedOpt(object):
         self.parser.add_argument('--deepspeed_config', help='deepspeed JSON config file')
         self.parser.add_argument('--local_rank', type=int, default=-1, help='local rank passed from distributed launcher')
                 
-        self.parser.add_argument("--results_path", type=str, default="results")
-        self.parser.add_argument("--exp_id", type=str, default=None, help="id of this run, required at training")
-
-
         self.parser.add_argument("--eval_folds", type=float, default=1.0, help="eval times during each epoch")
         self.parser.add_argument("--log_interval", type=int, default=100)
 
-
+        self.parser.add_argument("--iou_threshold", type=float, nargs='+', default=[0.3, 0.5, 0.7], help="List of IOU thresholds")
+        self.parser.add_argument("--ndcg_topk", type=int, nargs='+', default=[10, 20, 40], help="List of NDCG top k values")
 
     def parse(self):
         self.parser_init()
         args = parse_with_config(self.parser)
 
-        args.results_dir = os.path.join(args.results_root,"-".join([args.exp, time.strftime("%Y_%m_%d_%H_%M_%S")]))
+        args.results_dir = os.path.join(args.results_dir,"_".join([args.exp, time.strftime("%Y%m%d_%H%M%S")]))
         mkdirp(args.results_dir)
 
-        assert args.task in args.eval_tasks
-        args.ckpt_filepath = os.path.join(args.results_dir, "model.ckpt")
-        args.train_log_filepath = os.path.join(args.results_dir, "train.log.txt")
-        args.eval_log_filepath = os.path.join(args.results_dir, "eval.log.txt")
-        args.tensorboard_log_dir = os.path.join(args.results_dir, "tensorboard_log")
         # args.device = torch.device("cuda:%d" % args.device_ids[0] if args.device >= 0 else "cpu")
         args.device = torch.device("cuda" if args.device >= 0 else "cpu")
         self.args = args
