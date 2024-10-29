@@ -40,7 +40,7 @@ def prune_linear_layer(layer, index, dim=0):
 
 
 def mask_logits(target, mask, eps=-1e4):
-    return target * mask + (1 - mask) * eps
+    return (target * mask + (1 - mask) * eps).half()
 
 
 def load_partial_checkpoint(checkpoint, n_layers, skip_layers=True):

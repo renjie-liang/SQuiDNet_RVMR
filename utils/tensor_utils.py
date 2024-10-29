@@ -40,11 +40,11 @@ def pad_sequences_1d(sequences, dtype=torch.long, device=torch.device("cpu"), fi
     if isinstance(sequences[0], torch.Tensor):
         assert "torch" in str(dtype), "dtype and input type does not match"
         padded_seqs = torch.zeros((len(sequences), max_length) + extra_dims, dtype=dtype, device=device)
-        mask = torch.zeros((len(sequences), max_length), dtype=torch.float16, device=device)
+        mask = torch.zeros((len(sequences), max_length), dtype=torch.float, device=device)
     else:  # np
         assert "numpy" in str(dtype), "dtype and input type does not match"
         padded_seqs = np.zeros((len(sequences), max_length) + extra_dims, dtype=dtype)
-        mask = np.zeros((len(sequences), max_length), dtype=np.float16)
+        mask = np.zeros((len(sequences), max_length), dtype=np.float)
 
     for idx, seq in enumerate(sequences):
         end = lengths[idx]

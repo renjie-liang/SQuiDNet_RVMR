@@ -2,10 +2,12 @@ from tqdm import tqdm, trange
 import torch
 import torch.nn.functional as F
 import numpy as np
-
+import os
 from utils.run_utils import topk_3d, generate_min_max_length_mask, extract_topk_elements
 from model.ndcg_iou import calculate_ndcg_iou
 from utils.model_utils import set_cuda, set_cuda_half
+from torch.amp import autocast
+from utils.basic_utils import save_json
 
 def grab_corpus_feature(model, corpus_loader, device):
     all_video_feat, all_video_mask = [], []
@@ -13,10 +15,9 @@ def grab_corpus_feature(model, corpus_loader, device):
     
     with torch.no_grad():
         for batch_input in tqdm(corpus_loader, desc="Compute Corpus Feature: ", total=len(corpus_loader)):
-            # model_inputs = set_cuda(batch_input["model_inputs"], device)
-            model_inputs = set_cuda_half(batch_input["model_inputs"], device)
-
-            outputs = model.MMAencoder.VSMMA(model_inputs)
+            with autocast(device_type='cuda'):
+                model_inputs = set_cuda_half(batch_input["model_inputs"], device)
+                outputs = model.MMAencoder.VSMMA(model_inputs)
             _video_feat = outputs['vid']
             _sub_feat = outputs['sub'] 
             
@@ -49,36 +50,36 @@ def eval_epoch(model, corpus_feature, eval_loader, eval_gt, args, corpus_video_l
     all_query_score, all_end_prob, all_start_prob, all_top_video_name = [], [], [], []
 
     for batch_input in tqdm(eval_loader, desc="Compute Query Scores: ", total=len(eval_loader)):
-        model_inputs = set_cuda_half(batch_input["model_inputs"], device)
-        # model_inputs = set_cuda(batch_input["model_inputs"], device)
-        # get query feature and subtitle-matched video feature
-        query_feature = model.MMAencoder.query_enc(model_inputs)
-        query_batch = query_feature.shape[0]
-        
-        part_size = 300
-        video_prediction_score, start_probs, end_probs = [], [], []
-        for i in range(0, len(all_video_feat), part_size):
-            part_video_feat = all_video_feat[i : i+part_size, :, :].to(device)
-            part_video_mask = all_video_mask[i : i+part_size, :].to(device)
-            part_sub_feat = all_sub_feat[i : i+part_size, :, :].to(device)
+        with autocast(device_type='cuda'):
+            model_inputs = set_cuda_half(batch_input["model_inputs"], device)
+            # get query feature and subtitle-matched video feature
+            query_feature = model.MMAencoder.query_enc(model_inputs)
+            query_batch = query_feature.shape[0]
+                
+            part_size = 300
+            video_prediction_score, start_probs, end_probs = [], [], []
+            for i in range(0, len(all_video_feat), part_size):
+                part_video_feat = all_video_feat[i : i+part_size, :, :].to(device)
+                part_video_mask = all_video_mask[i : i+part_size, :].to(device)
+                part_sub_feat = all_sub_feat[i : i+part_size, :, :].to(device)
 
-            vid_len = part_video_feat.shape[1]
-            _query_feature, query_mask, tot_nmr_bmr_num = model.query_repeat(model_inputs, query_feature, part_video_feat)
-            final_feat, res_feat = model.VQMMA_Plus(part_video_feat, part_sub_feat, _query_feature, part_video_mask, query_mask)
-            part_start_probs, part_end_probs = model.CMP(final_feat, res_feat, part_video_mask)
+                vid_len = part_video_feat.shape[1]
+                _query_feature, query_mask, tot_nmr_bmr_num = model.query_repeat(model_inputs, query_feature, part_video_feat)
+                final_feat, res_feat = model.VQMMA_Plus(part_video_feat, part_sub_feat, _query_feature, part_video_mask, query_mask)
+                part_start_probs, part_end_probs = model.CMP(final_feat, res_feat, part_video_mask)
 
-            part_start_probs = part_start_probs.view(query_batch, tot_nmr_bmr_num, vid_len)
-            part_end_probs = part_end_probs.view(query_batch, tot_nmr_bmr_num, vid_len)
+                part_start_probs = part_start_probs.view(query_batch, tot_nmr_bmr_num, vid_len)
+                part_end_probs = part_end_probs.view(query_batch, tot_nmr_bmr_num, vid_len)
 
-            part_video_score = model.CMP.video_prediction(final_feat)
-            part_video_score = part_video_score.view(query_batch, tot_nmr_bmr_num)
+                part_video_score = model.CMP.video_prediction(final_feat)
+                part_video_score = part_video_score.view(query_batch, tot_nmr_bmr_num)
 
-            part_start_probs = F.softmax(part_start_probs, dim=-1) 
-            part_end_probs = F.softmax(part_end_probs, dim=-1)
-            
-            start_probs.append(part_start_probs.detach().cpu())
-            end_probs.append(part_end_probs.detach().cpu())
-            video_prediction_score.append(part_video_score.detach().cpu())
+                part_start_probs = F.softmax(part_start_probs, dim=-1) 
+                part_end_probs = F.softmax(part_end_probs, dim=-1)
+                
+                start_probs.append(part_start_probs.detach().cpu())
+                end_probs.append(part_end_probs.detach().cpu())
+                video_prediction_score.append(part_video_score.detach().cpu())
 
         start_probs = torch.concat(start_probs, dim=1)
         end_probs = torch.concat(end_probs, dim=1)
@@ -91,8 +92,8 @@ def eval_epoch(model, corpus_feature, eval_loader, eval_gt, args, corpus_video_l
         all_end_prob.append(end_probs.detach().cpu())
         all_top_video_name.extend(video_name_top)
 
-        # if len(all_query_id) > 5:
-        #     break
+        if len(all_query_id) > 10:
+            break
     all_query_id = torch.cat(all_query_id, dim=0)
     all_query_id = all_query_id.tolist()
     
@@ -123,10 +124,11 @@ def calculate_average_ndcg(all_query_id, all_start_prob, all_query_score, all_en
             pred_result.append({
                 "video_name": video_name,
                 "timestamp": [s, e],
-                "model_scores": score
+                "model_scores": score.item()
             })
         # print(pred_result)
         all_pred[query_id] = pred_result
-        
+
+    save_json(all_pred, os.path.join(args.results_dir, "pred_results.json"))
     average_ndcg = calculate_ndcg_iou(eval_gt, all_pred, args.iou_threshold, args.ndcg_topk)
     return average_ndcg

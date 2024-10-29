@@ -18,19 +18,19 @@ def count_parameters(model, verbose=True):
     return n_all, n_trainable
 
 
-def resume_model(logger, opt, model=None, optimizer=None, start_epoch=None):
-    checkpoint = torch.load(opt.checkpoint, map_location=opt.device)
+def resume_model(logger, ckpt_path, device, model=None, optimizer=None, start_epoch=None):
+    checkpoint = torch.load(ckpt_path, map_location=device)
     if model is not None:
         model.load_state_dict(checkpoint['model_state_dict'])
-        logger.info(f"Loading model from {opt.checkpoint} at epoch {checkpoint['epoch']}")
+        logger.info(f"Loading model from {ckpt_path} at epoch {checkpoint['epoch']}")
 
     if optimizer is not None:
         optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-        logger.info(f"Loading optimizer from {opt.checkpoint} at epoch {checkpoint['epoch']}")
+        logger.info(f"Loading optimizer from {ckpt_path} at epoch {checkpoint['epoch']}")
             
     if start_epoch is not None:
         start_epoch = checkpoint['epoch']
-        logger.info(f"Loading start_epoch from {opt.checkpoint} at epoch {checkpoint['epoch']}")
+        logger.info(f"Loading start_epoch from {ckpt_path} at epoch {checkpoint['epoch']}")
         
     return model, optimizer, start_epoch,
 

@@ -5,4 +5,4 @@ python train.py \
     --data_config config/data_config_tvrr.json \
     --local_batch_size 16 \
     --num_workers 8 \
-    --eval_folds 0.1
+    --eval_folds 10
