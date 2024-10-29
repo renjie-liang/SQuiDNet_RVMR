@@ -70,8 +70,8 @@ def set_cuda_half(batch,device):
                     _value = _value.half()
                 batch[key][i] = value[i].cuda(non_blocking=True, device=device)
         else:
-            if isinstance(_value, torch.FloatTensor):
-                _value = _value.half()
+            if isinstance(value, torch.FloatTensor):
+                value = value.half()
             batch[key] = value.cuda(non_blocking=True, device=device)
     return batch
 
@@ -80,7 +80,8 @@ def set_cuda_half(batch,device):
 
 
 def mask_logits(target, mask):
-    return target * mask + (1 - mask) * N_Infinite
+    res =  target * mask + (1 - mask) * N_Infinite
+    return res.half()
 
 # def vcmr_collate(batch):
 #     batch_annotation = [e["annotation"] for e in batch]  # no need to collate

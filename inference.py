@@ -44,7 +44,7 @@ def svmr_st_ed_probs(svmr_gt_st_probs, svmr_gt_ed_probs, ann_info, vid2idx, min_
 def generate_min_max_mask(array_shape, min_l, max_l):
     single_dims = (1, ) * (len(array_shape) - 2)
     mask_shape = single_dims + array_shape[-2:]
-    extra_length_mask_array = np.ones(mask_shape, dtype=np.float32) 
+    extra_length_mask_array = np.ones(mask_shape, dtype=np.float16) 
     mask_triu = np.triu(extra_length_mask_array, k=min_l)
     mask_triu_reversed = 1 - np.triu(extra_length_mask_array, k=max_l)
     final_prob_mask = mask_triu * mask_triu_reversed
@@ -64,13 +64,13 @@ def compute_query2vid(model, eval_dataset, args, max_before_nms=200, max_vcmr_vi
 
     if is_vcmr:
         flat_st_ed_scores_sorted_indices = np.empty((n_total_query, max_before_nms), dtype=int)
-        flat_st_ed_sorted_scores = np.zeros((n_total_query, max_before_nms), dtype=np.float32)
+        flat_st_ed_sorted_scores = np.zeros((n_total_query, max_before_nms), dtype=np.float16)
     if is_vr :
         sorted_q2c_indices = np.empty((n_total_query, max_vcmr_video), dtype=int)
-        sorted_q2c_scores = np.empty((n_total_query, max_vcmr_video), dtype=np.float32)
+        sorted_q2c_scores = np.empty((n_total_query, max_vcmr_video), dtype=np.float16)
     if is_svmr:
-        svmr_gt_st_probs = np.zeros((n_total_query, args.max_vid_len), dtype=np.float32)
-        svmr_gt_ed_probs = np.zeros((n_total_query, args.max_vid_len), dtype=np.float32)
+        svmr_gt_st_probs = np.zeros((n_total_query, args.max_vid_len), dtype=np.float16)
+        svmr_gt_ed_probs = np.zeros((n_total_query, args.max_vid_len), dtype=np.float16)
 
     ann_info = []
     for idx, batch in tqdm(enumerate(query_eval_loader), desc="Computing q embedding", total=len(query_eval_loader)):
@@ -157,8 +157,8 @@ def compute_query2vid(model, eval_dataset, args, max_before_nms=200, max_vcmr_vi
             video_indices_local, pred_st_indices, pred_ed_indices = np.unravel_index(_flat_st_ed_scores_sorted_indices, shape=(max_vcmr_video, args.max_vid_len, args.max_vid_len))
             video_indices = sorted_q2c_indices[i, video_indices_local]
 
-            pred_st_in_seconds = pred_st_indices.astype(np.float32) * 1.5
-            pred_ed_in_seconds = pred_ed_indices.astype(np.float32) * 1.5 + 1.5
+            pred_st_in_seconds = pred_st_indices.astype(np.float16) * 1.5
+            pred_ed_in_seconds = pred_ed_indices.astype(np.float16) * 1.5 + 1.5
             vcmr_predictions = []
             max_vcmr_vid_name_pool = ann_info[i]["max_vcmr_vid_name_list"]
             for j, (v_score, v_name_idx) in enumerate(zip(_flat_st_ed_sorted_scores, video_indices)):  # videos

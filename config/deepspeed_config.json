@@ -1,5 +1,5 @@
 {
-    "train_batch_size": 64,
+    "train_batch_size": 32,
     "gradient_accumulation_steps": 1,
     "optimizer": {
         "type": "Adam",
@@ -8,13 +8,8 @@
         }
     },
     "fp16": {
-        "enabled": true,
-        "auto_cast": true,
-        "loss_scale": 0,
-        "loss_scale_window": 1000,
-        "hysteresis": 2,
-        "consecutive_hysteresis": false,
-        "min_loss_scale": 1
+        "enabled": false,
+        "auto_cast": true
     },
     "session_params": {
         "zero_optimization": {

@@ -248,7 +248,7 @@ class BertEncoder(nn.Module):
         # Since we are adding it to the raw scores before the softmax, this is
         # effectively the same as removing these entirely.
         #extended_attention_mask = extended_attention_mask.to(dtype=next(self.parameters()).dtype)  # fp16 compatibility
-        extended_attention_mask = extended_attention_mask.to(dtype=torch.float32)  # fp16 compatibility modification for muti gpu
+        extended_attention_mask = extended_attention_mask.to(dtype=torch.float16)  # fp16 compatibility modification for muti gpu
         extended_attention_mask = (1.0 - extended_attention_mask) * -10000.0
 
 

@@ -37,8 +37,8 @@ def build_optimizer(model, opts):
 
 def train(model, train_set, corpus_set, val_set, test_set, args, logger):
 
-    train_loader = DataLoader(train_set, collate_fn=collate_fn, batch_size=args.batch, num_workers=args.num_workers, shuffle=True, pin_memory=True)
-    corpus_loader = DataLoader(corpus_set, collate_fn=collate_fn, batch_size=args.batch, num_workers=args.num_workers, shuffle=True, pin_memory=True)
+    train_loader = DataLoader(train_set, collate_fn=collate_fn, batch_size=args.local_batch_size, num_workers=args.num_workers, shuffle=True, pin_memory=True)
+    corpus_loader = DataLoader(corpus_set, collate_fn=collate_fn, batch_size=args.local_batch_size, num_workers=args.num_workers, shuffle=True, pin_memory=True)
     val_loader = DataLoader(val_set, collate_fn=collate_fn, batch_size=1, num_workers=args.num_workers, shuffle=False, pin_memory=True)
     test_loader = DataLoader(test_set, collate_fn=collate_fn, batch_size=1, num_workers=args.num_workers, shuffle=False, pin_memory=True)
     corpus_video_list = corpus_set.corpus_video_list
@@ -62,6 +62,7 @@ def train(model, train_set, corpus_set, val_set, test_set, args, logger):
             loss = model(model_inputs)
             optimizer.zero_grad()
             loss.backward()
+            print(loss)
             loss_meter.update(loss.item())
             optimizer.step()
 
@@ -100,10 +101,7 @@ def train_squid():
     # Ensuer the cuda is available
     torch.cuda.manual_seed_all(seed)
 
-    # args.writer = SummaryWriter(args.tensorboard_log_dir)
-    args.train_log_txt_formatter = "{time_str}: epch {epoch:03d} loss {loss_str}\n"
-    args.eval_log_txt_formatter = "{time_str}: epch {epoch:03d} metrics {eval_metrics_str}\n"
-    
+
     data_config = load_config(args.data_config)
     train_set = SQTrainDataset(data_path=data_config.train_data_path, config=data_config, neg_bmr_pred_num=args.neg_bmr_pred_num, bmr_allowance=args.bmr_allowance)
     corpus_set = SQCorpusDataset(data_path=data_config.corpus_path, config=data_config)

@@ -21,9 +21,9 @@ def pad_sequences_1d(sequences, dtype=torch.long, device=torch.device("cpu"), fi
         >>> test_data_3d = [torch.randn(2,3,4), torch.randn(4,3,4), torch.randn(1,3,4)]
         >>> pad_sequences_1d(test_data_3d, dtype=torch.float)
         >>> test_data_list = [[1,2,3], [1,2], [3,4,7,9]]
-        >>> pad_sequences_1d(test_data_list, dtype=np.float32)
+        >>> pad_sequences_1d(test_data_list, dtype=np.float16)
         >>> test_data_3d = [np.random.randn(2,3,4), np.random.randn(4,3,4), np.random.randn(1,3,4)]
-        >>> pad_sequences_1d(test_data_3d, dtype=np.float32)
+        >>> pad_sequences_1d(test_data_3d, dtype=np.float16)
     """
     if isinstance(sequences[0], list):
         if "torch" in str(dtype):
@@ -40,11 +40,11 @@ def pad_sequences_1d(sequences, dtype=torch.long, device=torch.device("cpu"), fi
     if isinstance(sequences[0], torch.Tensor):
         assert "torch" in str(dtype), "dtype and input type does not match"
         padded_seqs = torch.zeros((len(sequences), max_length) + extra_dims, dtype=dtype, device=device)
-        mask = torch.zeros((len(sequences), max_length), dtype=torch.float32, device=device)
+        mask = torch.zeros((len(sequences), max_length), dtype=torch.float16, device=device)
     else:  # np
         assert "numpy" in str(dtype), "dtype and input type does not match"
         padded_seqs = np.zeros((len(sequences), max_length) + extra_dims, dtype=dtype)
-        mask = np.zeros((len(sequences), max_length), dtype=np.float32)
+        mask = np.zeros((len(sequences), max_length), dtype=np.float16)
 
     for idx, seq in enumerate(sequences):
         end = lengths[idx]
@@ -58,7 +58,7 @@ def pad_sequences_2d(sequences, dtype=torch.long):
         only allow the first two dims has variable lengths
     Args:
         sequences: list(n-d tensor or list)
-        dtype: torch.long for word indices / torch.float (float32) for other cases
+        dtype: torch.long for word indices / torch.float (float16) for other cases
     Returns:
     Examples:
         >>> test_data_list = [[[1, 3, 5], [3, 7, 4, 1]], [[98, 34, 11, 89, 90], [22], [34, 56]],]
@@ -84,7 +84,7 @@ def pad_sequences_2d(sequences, dtype=torch.long):
         extra_dims = ()
 
     padded_seqs = torch.zeros((bsz, max_para_len, max_sen_len) + extra_dims, dtype=dtype)
-    mask = torch.zeros(bsz, max_para_len, max_sen_len).float()
+    mask = torch.zeros(bsz, max_para_len, max_sen_len, dtype=torch.float16)
 
     for b_i in range(bsz):
         for sen_i, sen_l in enumerate(sen_lengths[b_i]):

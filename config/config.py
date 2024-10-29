@@ -83,6 +83,10 @@ class SharedOpt(object):
                 
         self.parser.add_argument("--eval_folds", type=float, default=1.0, help="eval times during each epoch")
         self.parser.add_argument("--log_interval", type=int, default=100)
+        self.parser.add_argument("--save_interval", type=int, default=200)
+        self.parser.add_argument("--load_dir", type=str, default=None)
+        self.parser.add_argument("--ckpt_id", type=str, default=None)
+    
 
         self.parser.add_argument("--iou_threshold", type=float, nargs='+', default=[0.3, 0.5, 0.7], help="List of IOU thresholds")
         self.parser.add_argument("--ndcg_topk", type=int, nargs='+', default=[10, 20, 40], help="List of NDCG top k values")

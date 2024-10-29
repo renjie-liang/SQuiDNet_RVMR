@@ -5,16 +5,17 @@ import numpy as np
 
 from utils.run_utils import topk_3d, generate_min_max_length_mask, extract_topk_elements
 from model.ndcg_iou import calculate_ndcg_iou
-from utils.model_utils import set_cuda
+from utils.model_utils import set_cuda, set_cuda_half
 
 def grab_corpus_feature(model, corpus_loader, device):
-    model.eval()
     all_video_feat, all_video_mask = [], []
     all_sub_feat, all_sub_mask = [], []
     
     with torch.no_grad():
         for batch_input in tqdm(corpus_loader, desc="Compute Corpus Feature: ", total=len(corpus_loader)):
-            model_inputs = set_cuda(batch_input["model_inputs"], device)
+            # model_inputs = set_cuda(batch_input["model_inputs"], device)
+            model_inputs = set_cuda_half(batch_input["model_inputs"], device)
+
             outputs = model.MMAencoder.VSMMA(model_inputs)
             _video_feat = outputs['vid']
             _sub_feat = outputs['sub'] 
@@ -48,8 +49,8 @@ def eval_epoch(model, corpus_feature, eval_loader, eval_gt, args, corpus_video_l
     all_query_score, all_end_prob, all_start_prob, all_top_video_name = [], [], [], []
 
     for batch_input in tqdm(eval_loader, desc="Compute Query Scores: ", total=len(eval_loader)):
-
-        model_inputs = set_cuda(batch_input["model_inputs"], device)
+        model_inputs = set_cuda_half(batch_input["model_inputs"], device)
+        # model_inputs = set_cuda(batch_input["model_inputs"], device)
         # get query feature and subtitle-matched video feature
         query_feature = model.MMAencoder.query_enc(model_inputs)
         query_batch = query_feature.shape[0]

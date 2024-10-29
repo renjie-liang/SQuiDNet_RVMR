@@ -24,9 +24,20 @@ import deepspeed
 from lightning_fabric.utilities.seed import seed_everything
 
 
+
+def build_params(model, opts):
+    param_optimizer = [(n, p) for n, p in model.named_parameters() if (n.startswith('encoder') or n.startswith('query_weight')) and p.requires_grad ]
+    param_top = [(n, p) for n, p in model.named_parameters() if  ( not n.startswith('encoder') and not n.startswith('query_weight'))  and p.requires_grad]
+    no_decay = ['bias', 'LayerNorm.bias', 'LayerNorm.weight']
+    optimizer_grouped_parameters = [{'params': [p for n, p in param_top if not any(nd in n for nd in no_decay)], 'weight_decay': opts.wd},
+        {'params': [p for n, p in param_top if any(nd in n for nd in no_decay)], 'weight_decay': 0.0},
+        {'params': [p for n, p in param_optimizer if not any(nd in n for nd in no_decay)], 'lr': opts.lr_mul * opts.lr, 'weight_decay': opts.wd},
+        {'params': [p for n, p in param_optimizer if any(nd in n for nd in no_decay)], 'lr': opts.lr_mul * opts.lr, 'weight_decay': 0.0}]
+    return optimizer_grouped_parameters
+
+
+
 def train(args, model, train_set, corpus_set, val_set, test_set, logger):
-
-
     train_loader = DataLoader(train_set, collate_fn=collate_fn, batch_size=args.local_batch_size, num_workers=args.num_workers, shuffle=True, pin_memory=True)
     corpus_loader = DataLoader(corpus_set, collate_fn=collate_fn, batch_size=args.local_batch_size, num_workers=args.num_workers, shuffle=True, pin_memory=True)
     val_loader = DataLoader(val_set, collate_fn=collate_fn, batch_size=1, num_workers=args.num_workers, shuffle=False, pin_memory=True)
@@ -40,9 +51,10 @@ def train(args, model, train_set, corpus_set, val_set, test_set, logger):
     
     model_engine, optimizer, _, _ = deepspeed.initialize(config=args.deepspeed_config,
                                                          model=model,
-                                                         model_parameters=model.parameters())
+                                                         model_parameters=build_params(model, args))
+                                                        #  model_parameters=model.parameters())
 
-
+    client_sd = {}
     best_val_ndcg = 0.0
     start_epoch = 0 if args.no_eval_untrained else -1
     eval_step = len(train_loader) // args.eval_folds
@@ -51,14 +63,14 @@ def train(args, model, train_set, corpus_set, val_set, test_set, logger):
         num_training = len(train_loader)
         loss_meter = AverageMeter()
         for step, batch in tqdm(enumerate(train_loader), desc=f"Training", total=num_training):
-            global_step = epoch * num_training + step + 1
+            global_step = epoch * num_training + step  + 1
             # continue
             # model_inputs = set_cuda(batch["model_inputs"], args.device)
             model_inputs = set_cuda_half(batch["model_inputs"], args.device)
             # model_inputs = set_cuda_local_rank(batch["model_inputs"], local_rank)
 
-            
             loss = model_engine(model_inputs)
+            print(loss)
             loss_meter.update(loss.item())
             model_engine.backward(loss)
             model_engine.step()
@@ -70,21 +82,26 @@ def train(args, model, train_set, corpus_set, val_set, test_set, logger):
                     logger.info(f"Memory Allocated on GPU {i}: {torch.cuda.memory_allocated(i) / 1024**3:.2f} GB")
                     logger.info(f"Memory Cached on GPU {i}: {torch.cuda.memory_reserved(i) / 1024**3:.2f} GB")
 
-        
-            # if global_step % eval_step == 0:  #  or step == len(train_loader):
-            #     corpus_feature = grab_corpus_feature(model, corpus_loader, args.device)
-            #     val_ndcg_iou = eval_epoch(model, corpus_feature, val_loader, val_gt, args, corpus_video_list)
-            #     # test_ndcg_iou = eval_epoch(model, corpus_feature, test_loader, test_gt, args, corpus_video_list)
-            #     logger_ndcg_iou(val_ndcg_iou, logger, "VAL")
-            #     # logger_ndcg_iou(test_ndcg_iou, logger, "TEST")
 
-            #     if val_ndcg_iou[20][0.5] > best_val_ndcg:
-            #         best_val_ndcg = val_ndcg_iou[20][0.5]
-            #         logger_ndcg_iou(val_ndcg_iou, logger, "BEST VAL")
-            #         # logger_ndcg_iou(test_ndcg_iou, logger, "BEST TEST")
-            #         bestmodel_path = os.path.join(args.results_dir, "best_model.pt")
-            #         save_model(model, optimizer, epoch, bestmodel_path, logger)
+            if global_step % eval_step == 0 or step == len(train_loader):
+                model.eval()
+                corpus_feature = grab_corpus_feature(model, corpus_loader, args.device)
+                val_ndcg_iou = eval_epoch(model, corpus_feature, val_loader, val_gt, args, corpus_video_list)
+                # test_ndcg_iou = eval_epoch(model, corpus_feature, test_loader, test_gt, args, corpus_video_list)
+                model.train()
 
+                logger_ndcg_iou(val_ndcg_iou, logger, "VAL")
+                # logger_ndcg_iou(test_ndcg_iou, logger, "TEST")
+
+                if val_ndcg_iou[20][0.5] > best_val_ndcg:
+                    best_val_ndcg = val_ndcg_iou[20][0.5]
+                    logger_ndcg_iou(val_ndcg_iou, logger, "BEST VAL")
+                    # logger_ndcg_iou(test_ndcg_iou, logger, "BEST TEST")
+                    client_sd['step'] = step
+                    model_engine.save_checkpoint(save_dir=args.results_dir, tag="best", client_state = client_sd)
+
+        client_sd['step'] = step
+        model_engine.save_checkpoint(save_dir=args.results_dir, tag=epoch, client_state = client_sd)
 
 def train_squid():
     # Set up the configurations
@@ -97,6 +114,7 @@ def train_squid():
     ds_config = load_config(args.deepspeed_config)
     args.global_batch_size = ds_config.train_batch_size
     args.local_batch_size = args.global_batch_size // world_size
+    # args.local_eval_batch_size = 1
 
 
     # args.writer = SummaryWriter(args.tensorboard_log_dir)
