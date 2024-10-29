@@ -142,5 +142,5 @@ if __name__ == "__main__":
 
 # CUDA_VISIBLE_DEVICES=5,7 deepspeed --num_gpus=1 demo_deepspeed.py
 # CUDA_VISIBLE_DEVICES=5,7 deepspeed --hostfile config/hostfile.txt --num_gpus=2 demo_deepspeed.py
-# deepspeed --hostfile hostfile.txt --num_gpus=2 demo_deepspeed.py
-# 
+# deepspeed --hostfile hostfile.txt --num_gpus=1 demo_deepspeed.py
+# deepspeed  --num_gpus=1 demo_deepspeed.py

@@ -58,9 +58,6 @@ def read_lines(filepath):
         return [e.strip("\n") for e in f.readlines()]
 
 
-def mkdirp(p):
-    if not os.path.exists(p):
-        os.makedirs(p)
 
 
 def flat_list_of_lists(l):

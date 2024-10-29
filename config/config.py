@@ -5,7 +5,7 @@ import argparse
 import sys
 import pprint
 import json
-from utils.basic_utils import mkdirp, load_json, save_json, make_zipfile
+from utils.basic_utils import load_json, save_json, make_zipfile
 import pdb
 
 def parse_with_config(parser):
@@ -32,7 +32,7 @@ class SharedOpt(object):
         self.parser.add_argument("--eval_type", type=str, default="val", help="should be used for loss calculation and prediction")
         self.parser.add_argument("--results_dir", type=str, default="results")
         self.parser.add_argument("--exp", type=str, default=None, help="experiment name")
-        self.parser.add_argument("--seed", type=int, default=2018, help="random seed")
+        self.parser.add_argument("--seed", type=int, default=2024, help="random seed")
         self.parser.add_argument("--device", type=int, default=0, help="0 means gpu id 0")
         self.parser.add_argument("--device_ids", type=int, nargs="+", default=[0], help="use for multi gpu")
         self.parser.add_argument("--num_workers", type=int, default=8, help="num subprocesses used to load the data, 1 can debug loading time")
@@ -43,7 +43,8 @@ class SharedOpt(object):
         self.parser.add_argument("--wd", type=float, default=0.01, help="weight decay")
         self.parser.add_argument("--n_epoch", type=int, default=4000, help="number of epochs")
         self.parser.add_argument("--max_es_cnt", type=int, default=3,help="number of epochs to early stop, -1: no use of early stop")
-        self.parser.add_argument("--batch", type=int, default=32, help="batch size")
+        self.parser.add_argument("--global_batch_size", type=int, default=None, help="global batch size")
+        self.parser.add_argument("--local_batch_size", type=int, default=None, help="local batch size")
         self.parser.add_argument("--no_eval_untrained", action="store_true", help="Evaluate for debug")
         self.parser.add_argument("--grad_clip", type=float, default=-1, help="perform gradient clip, -1: disable")
         self.parser.add_argument("--eval_epoch_num", type=int, default=1, help="eval_epoch_num")
@@ -91,7 +92,7 @@ class SharedOpt(object):
         args = parse_with_config(self.parser)
 
         args.results_dir = os.path.join(args.results_dir,"_".join([args.exp, time.strftime("%Y%m%d_%H%M%S")]))
-        mkdirp(args.results_dir)
+        os.makedirs(args.results_dir, exist_ok=True)
 
         # args.device = torch.device("cuda:%d" % args.device_ids[0] if args.device >= 0 else "cpu")
         args.device = torch.device("cuda" if args.device >= 0 else "cpu")

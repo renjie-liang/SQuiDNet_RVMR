@@ -14,7 +14,7 @@
 
 eval "$(micromamba shell hook --shell bash)"
 
-micromamba activate squid
+micromamba activate r2gen
 
 python train.py \
     --exp top_01 \
@@ -24,4 +24,4 @@ python train.py \
     --max_vcmr_video 10 \
     --loss_measure moment_video \
     --num_workers 8 \
-    --eval_folds 0.1
+    --eval_folds 1

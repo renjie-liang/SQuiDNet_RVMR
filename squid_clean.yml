@@ -5,6 +5,8 @@ dependencies:
   - tqdm
   - tensorboard
   - msgpack-numpy
+  - mpi4py
+  - libcugraph
   - pip:
     - easydict
     - msgpack

@@ -61,12 +61,18 @@ def set_cuda_half(batch,device):
     for key, value in batch.items():
         if isinstance(value, dict):
             for _key, _value in value.items():
-                batch[key][_key] = _value.cuda(non_blocking=True, device=device).half()
+                if isinstance(_value, torch.FloatTensor):
+                    _value = _value.half()
+                batch[key][_key] = _value.cuda(non_blocking=True, device=device)
         elif isinstance(value, (list,)):
             for i in range(len(value)):
-                batch[key][i] = value[i].cuda(non_blocking=True, device=device).half()
+                if isinstance(_value, torch.FloatTensor):
+                    _value = _value.half()
+                batch[key][i] = value[i].cuda(non_blocking=True, device=device)
         else:
-            batch[key] = value.cuda(non_blocking=True, device=device).half()
+            if isinstance(_value, torch.FloatTensor):
+                _value = _value.half()
+            batch[key] = value.cuda(non_blocking=True, device=device)
     return batch
 
 
