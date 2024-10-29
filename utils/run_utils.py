@@ -18,19 +18,19 @@ def count_parameters(model, verbose=True):
     return n_all, n_trainable
 
 
-def resume_model(logger, opt, model=None, optimizer=None, start_epoch=None):
-    checkpoint = torch.load(opt.checkpoint, map_location=opt.device)
+def resume_model(logger, ckpt_path, device, model=None, optimizer=None, start_epoch=None):
+    checkpoint = torch.load(ckpt_path, map_location=device)
     if model is not None:
         model.load_state_dict(checkpoint['model_state_dict'])
-        logger.info(f"Loading model from {opt.checkpoint} at epoch {checkpoint['epoch']}")
+        logger.info(f"Loading model from {ckpt_path} at epoch {checkpoint['epoch']}")
 
     if optimizer is not None:
         optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-        logger.info(f"Loading optimizer from {opt.checkpoint} at epoch {checkpoint['epoch']}")
+        logger.info(f"Loading optimizer from {ckpt_path} at epoch {checkpoint['epoch']}")
             
     if start_epoch is not None:
         start_epoch = checkpoint['epoch']
-        logger.info(f"Loading start_epoch from {opt.checkpoint} at epoch {checkpoint['epoch']}")
+        logger.info(f"Loading start_epoch from {ckpt_path} at epoch {checkpoint['epoch']}")
         
     return model, optimizer, start_epoch,
 
@@ -87,7 +87,7 @@ def generate_min_max_length_mask(array_shape, min_l, max_l):
     """
     single_dims = (1, ) * (len(array_shape) - 2)
     mask_shape = single_dims + array_shape[-2:]
-    extra_length_mask_array = np.ones(mask_shape, dtype=np.float32)  # (1, ..., 1, L, L)
+    extra_length_mask_array = np.ones(mask_shape, dtype=np.float16)  # (1, ..., 1, L, L)
     mask_triu = np.triu(extra_length_mask_array, k=min_l)
     mask_triu_reversed = 1 - np.triu(extra_length_mask_array, k=max_l)
     final_prob_mask = mask_triu * mask_triu_reversed

@@ -17,7 +17,7 @@ class SimpleModel(nn.Module):
 def generate_data(num_samples, input_dim):
     X = np.random.rand(num_samples, input_dim)  # Generate random input data
     y = np.random.rand(num_samples, 1)          # Generate random target data
-    return torch.tensor(X, dtype=torch.float32), torch.tensor(y, dtype=torch.float32)
+    return torch.tensor(X, dtype=torch.float16), torch.tensor(y, dtype=torch.float16)
 
 # Training script
 def train(model, data_loader, criterion, optimizer, num_epochs, device):
