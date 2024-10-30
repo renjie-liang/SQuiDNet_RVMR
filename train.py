@@ -13,7 +13,7 @@ from torch.utils.data import DataLoader
 # from torch.utils.tensorboard import SummaryWriter
 from config.config import SharedOpt
 from model.squidnet import SQuiDNet
-from loader import SQTrainDataset, SQCorpusDataset, SQEvalDataset
+from loader import SQTrainDataset, SQCorpusDataset, SQEvalDataset, SQDataset
 # from inference import eval_epoch
 from optim.adamw import AdamW
 from utils.basic_utils import AverageMeter,load_config, get_logger, rm_key_from_odict
@@ -22,7 +22,9 @@ from model.infer_lib import grab_corpus_feature, eval_epoch
 from utils.run_utils import logger_ndcg_iou, save_model, resume_model
 from torch.amp import autocast, GradScaler
 from lightning_fabric.utilities.seed import seed_everything
-
+from unuse.inference import compute_query2vid
+from utils.inference_utils  import get_submission_top_n
+from standalone_eval.eval import eval_retrieval
 
 def build_optimizer(model, opts):
     param_optimizer = [(n, p) for n, p in model.named_parameters() if (n.startswith('encoder') or n.startswith('query_weight')) and p.requires_grad ]
@@ -36,7 +38,7 @@ def build_optimizer(model, opts):
     return optimizer
 
 
-def train(model, train_set, corpus_set, val_set, test_set, args, logger):
+def train(model, train_set, corpus_set, val_set, test_set, vcmr_eval_dataset, args, logger):
 
     scaler = GradScaler()
     train_loader = DataLoader(train_set, collate_fn=collate_fn, batch_size=args.local_batch_size, num_workers=args.num_workers, shuffle=True, pin_memory=True)
@@ -47,9 +49,12 @@ def train(model, train_set, corpus_set, val_set, test_set, args, logger):
     val_gt = val_set.ground_truth
     test_gt = test_set.ground_truth
 
+
+
+
     # Prepare optimizer
     optimizer = build_optimizer(model, args)
-    # model = model.half()
+    model = model.half()
     best_val_ndcg = 0.0
     start_epoch = 0 
     eval_step = int(len(train_loader) // args.eval_folds)
@@ -58,30 +63,44 @@ def train(model, train_set, corpus_set, val_set, test_set, args, logger):
         num_training = len(train_loader)
         loss_meter = AverageMeter()
         for step, batch in tqdm(enumerate(train_loader), desc=f"Training", total=num_training):
-            step = step + 1
+            step = step # + 1
             # continue
             model_inputs = set_cuda(batch["model_inputs"], args.device)
 
-            # with autocast(device_type='cuda'):
-            optimizer.zero_grad()
-            # model_inputs = set_cuda_half(batch["model_inputs"], args.device)
-            loss = model(model_inputs)
-            # print(loss)
-            # scaler.scale(loss).backward()
-            loss.backward()
-            loss_meter.update(loss.item())
-            optimizer.step()
+            with autocast(device_type='cuda'):
+                optimizer.zero_grad()
+                model_inputs = set_cuda_half(batch["model_inputs"], args.device)
+                loss = model(model_inputs)
+                print(loss)
+                scaler.scale(loss).backward()
+                # loss.backward()
+                loss_meter.update(loss.item())
+                optimizer.step()
 
-            # if step > 100:
+            if step % args.log_interval == 0:
+                logger.info(f"EPOCH {epoch}/{args.n_epoch} | STEP: {step}|{len(train_loader)} | Loss: {loss_meter.avg:.4f}")
+                loss_meter.reset()
+                for i in range(torch.cuda.device_count()):
+                    logger.info(f"Memory Allocated on GPU {i}: {torch.cuda.memory_allocated(i) / 1024**3:.2f} GB")
+                    logger.info(f"Memory Cached on GPU {i}: {torch.cuda.memory_reserved(i) / 1024**3:.2f} GB")
+
+
+            if step % eval_step == 0  or step == len(train_loader):
+                eval_res = compute_query2vid(model, vcmr_eval_dataset, args, max_before_nms=args.max_before_nms, max_vcmr_video=args.max_vcmr_video)
+                eval_res["vid2idx"] = vcmr_eval_dataset.vid2idx
+
+                IOU_THDS = (0.5, 0.7)
+                logger.info("Saving/Evaluating before nms results")
+                submission_path = os.path.join(args.results_dir, "vcmr_predictions.json")
+                eval_submission = get_submission_top_n(eval_res, top_n=100)
+                # save_json(eval_submission, submission_path)
+
+                metrics = eval_retrieval(eval_submission, vcmr_eval_dataset.query_data, iou_thds=IOU_THDS, match_number=True, verbose=False, use_desc_type=args.data_name == "tvr")
+                logger.info(metrics)
+
         bestmodel_path = os.path.join(args.results_dir, f"{epoch}_model.pt")
         save_model(model, optimizer, epoch, bestmodel_path, logger)
 
-            # if step % args.log_interval == 0:
-            #     logger.info(f"EPOCH {epoch}/{args.n_epoch} | STEP: {step}|{len(train_loader)} | Loss: {loss_meter.avg:.4f}")
-            #     loss_meter.reset()
-            #     for i in range(torch.cuda.device_count()):
-            #         logger.info(f"Memory Allocated on GPU {i}: {torch.cuda.memory_allocated(i) / 1024**3:.2f} GB")
-            #         logger.info(f"Memory Cached on GPU {i}: {torch.cuda.memory_reserved(i) / 1024**3:.2f} GB")
 
             # if step % eval_step == 0  or step == len(train_loader):
             #     corpus_feature = grab_corpus_feature(model, corpus_loader, args.device)
@@ -112,6 +131,7 @@ if __name__ == '__main__':
     val_set = SQEvalDataset(data_path=data_config.val_data_path, config=data_config)
     test_set = SQEvalDataset(data_path=data_config.test_data_path, config=data_config)
 
+    vcmr_eval_dataset = SQDataset(data_type=args.eval_type, config=data_config, max_vid_len=args.max_vid_len, max_query_len=args.max_query_len, is_val=True, max_vcmr_video=args.max_vcmr_video)
 
     model_config = load_config(args.model_config)
     model = SQuiDNet(model_config, vid_dim=args.vid_dim, text_dim=args.text_dim, hidden_dim=args.hidden_dim, lw_vid=args.lw_vid, lw_st_ed=args.lw_st_ed, loss_measure=args.loss_measure)
@@ -133,6 +153,6 @@ if __name__ == '__main__':
 
 
     logger.info("Start Training...")
-    train(model, train_set, corpus_set, val_set, test_set, args, logger)
+    train(model, train_set, corpus_set, val_set, test_set, vcmr_eval_dataset, args, logger)
 
 

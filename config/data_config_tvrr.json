@@ -10,5 +10,14 @@
   "test_bmr_path": "bmr/bmr_prd_test_public_tvr",
   "corpus_path": "/red/bianjiang/liang.renjie/RVMR/TVR-Ranking/data//TVR_Ranking/video_corpus.json",
   "video_duration_idx_path": "text_data_ref/tvr_video2dur_idx.json",
-  "cctable_path": "./data/data/coocurrence_table/cctable_update.json"
+  "cctable_path": "./data/data/coocurrence_table/cctable_update.json",
+
+  "data_path": "./data/data",
+  "vcmr_query_path": "sub_query_feature/roberta_query",
+  "vcmr_eval_data_path": "text_data_ref/tvr_val_release_noun_predicate.jsonl",
+  "vcmr_eval_bmr_path": "bmr/bmr_prd_val_tvr",
+  "vcmr_video_duration_idx_path": "text_data_ref/tvr_video2dur_idx.json",
+  "vcmr_cctable_path": "coocurrence_table/cctable_update.json"
+
+
 }

@@ -36,6 +36,7 @@ class SharedOpt(object):
         self.parser.add_argument("--device", type=int, default=0, help="0 means gpu id 0")
         self.parser.add_argument("--device_ids", type=int, nargs="+", default=[0], help="use for multi gpu")
         self.parser.add_argument("--num_workers", type=int, default=8, help="num subprocesses used to load the data, 1 can debug loading time")
+        self.parser.add_argument("--data_path", type=str, default=None)
 
         # configuration: training specification
         self.parser.add_argument("--lr", type=float, default=1e-4, help="learning rate")
@@ -49,6 +50,7 @@ class SharedOpt(object):
         self.parser.add_argument("--grad_clip", type=float, default=-1, help="perform gradient clip, -1: disable")
         self.parser.add_argument("--eval_epoch_num", type=int, default=1, help="eval_epoch_num")
         self.parser.add_argument("--batch", type=int, default=None, help="local batch size")
+        self.parser.add_argument("--eval_query_batch", type=int, default=8, help="local batch size")
 
         # configuration: data
         self.parser.add_argument("--max_vid_len", type=int, default=100, help="max number of vid len 100")

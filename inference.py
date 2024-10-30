@@ -27,7 +27,6 @@ from lightning_fabric.utilities.seed import seed_everything
 
 
 def infer(model, corpus_set, val_set, test_set, args, logger):
-
     scaler = GradScaler()
     corpus_loader = DataLoader(corpus_set, collate_fn=collate_fn, batch_size=args.local_batch_size, num_workers=args.num_workers, shuffle=True, pin_memory=True)
     val_loader = DataLoader(val_set, collate_fn=collate_fn, batch_size=1, num_workers=args.num_workers, shuffle=False, pin_memory=True)
@@ -55,7 +54,6 @@ if __name__ == '__main__':
     corpus_set = SQCorpusDataset(data_path=data_config.corpus_path, config=data_config)
     val_set = SQEvalDataset(data_path=data_config.val_data_path, config=data_config)
     test_set = SQEvalDataset(data_path=data_config.test_data_path, config=data_config)
-
     model = SQuiDNet(model_config, vid_dim=args.vid_dim, text_dim=args.text_dim, hidden_dim=args.hidden_dim, lw_vid=args.lw_vid, lw_st_ed=args.lw_st_ed, loss_measure=args.loss_measure)
 
 

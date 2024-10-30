@@ -3,6 +3,7 @@ srun --partition=gpu --gres=gpu:1 --nodes=1 --cpus-per-task=32 --mem=300gb --tim
 micromamba activate r2gen
 sh scripts/train_tvrr.sh 
 sh scripts/infer_tvrr.sh 
+sh scripts/infer_old.sh 
 
 sh scripts/train_tvrr_deepspeed.sh 
 sh scripts/infer_tvrr_deepspeed.sh 

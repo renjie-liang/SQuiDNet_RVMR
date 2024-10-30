@@ -13,12 +13,13 @@ from utils.inference_utils  import get_submission_top_n, post_processing_vcmr_nm
 from utils.basic_utils import save_json, load_config
 from utils.tensor_utils import find_max_triples_from_upper_triangle_product
 from standalone_eval.eval import eval_retrieval
-from utils.model_utils import set_cuda, vcmr_collate, N_Infinite
+from utils.model_utils import set_cuda, vcmr_collate, N_Infinite, set_cuda_half
 import logging
 from time import time
 import pdb
-logger = logging.getLogger(__name__)
-logging.basicConfig(format="%(asctime)s.%(msecs)03d:%(levelname)s:%(name)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S", level=logging.INFO)
+# logger = logging.getLogger(__name__)
+# logging.basicConfig(format="%(asctime)s.%(msecs)03d:%(levelname)s:%(name)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S", level=logging.INFO)
+from torch.amp import autocast
 
 
 def svmr_st_ed_probs(svmr_gt_st_probs, svmr_gt_ed_probs, ann_info, vid2idx, min_pred_l, max_pred_l, max_before_nms):
@@ -44,13 +45,13 @@ def svmr_st_ed_probs(svmr_gt_st_probs, svmr_gt_ed_probs, ann_info, vid2idx, min_
 def generate_min_max_mask(array_shape, min_l, max_l):
     single_dims = (1, ) * (len(array_shape) - 2)
     mask_shape = single_dims + array_shape[-2:]
-    extra_length_mask_array = np.ones(mask_shape, dtype=np.float32) 
+    extra_length_mask_array = np.ones(mask_shape, dtype=np.float16) 
     mask_triu = np.triu(extra_length_mask_array, k=min_l)
     mask_triu_reversed = 1 - np.triu(extra_length_mask_array, k=max_l)
     final_prob_mask = mask_triu * mask_triu_reversed
     return final_prob_mask
 
-def compute_query2vid(model, eval_dataset, args, max_before_nms=200, max_vcmr_video=100, tasks=("SVMR",)):
+def compute_query2vid(model, eval_dataset, args, max_before_nms=200, max_vcmr_video=100, tasks=("VCMR", "VR")):
     is_vr = "VR" in tasks
     is_vcmr = "VCMR" in tasks
     is_svmr = "SVMR" in tasks
@@ -64,29 +65,28 @@ def compute_query2vid(model, eval_dataset, args, max_before_nms=200, max_vcmr_vi
 
     if is_vcmr:
         flat_st_ed_scores_sorted_indices = np.empty((n_total_query, max_before_nms), dtype=int)
-        flat_st_ed_sorted_scores = np.zeros((n_total_query, max_before_nms), dtype=np.float32)
+        flat_st_ed_sorted_scores = np.zeros((n_total_query, max_before_nms), dtype=np.float16)
     if is_vr :
         sorted_q2c_indices = np.empty((n_total_query, max_vcmr_video), dtype=int)
-        sorted_q2c_scores = np.empty((n_total_query, max_vcmr_video), dtype=np.float32)
+        sorted_q2c_scores = np.empty((n_total_query, max_vcmr_video), dtype=np.float16)
     if is_svmr:
-        svmr_gt_st_probs = np.zeros((n_total_query, args.max_vid_len), dtype=np.float32)
-        svmr_gt_ed_probs = np.zeros((n_total_query, args.max_vid_len), dtype=np.float32)
+        svmr_gt_st_probs = np.zeros((n_total_query, args.max_vid_len), dtype=np.float16)
+        svmr_gt_ed_probs = np.zeros((n_total_query, args.max_vid_len), dtype=np.float16)
 
     ann_info = []
     for idx, batch in tqdm(enumerate(query_eval_loader), desc="Computing q embedding", total=len(query_eval_loader)):
 
         ann_info.extend(batch["annotation"])
-        model_inputs = set_cuda(batch["model_inputs"], args.device)
+        # model_inputs = set_cuda(batch["model_inputs"], args.device)
+        model_inputs = set_cuda_half(batch["model_inputs"], args.device)
 
-        if args.device.type == "cuda":
-            model_inputs = set_cuda(batch["model_inputs"], args.device)
-        else:
-            model_inputs = batch["model_inputs"]
-
-        if len(args.device_ids) > 1:
-            video_similarity_score, begin_score_distribution, end_score_distribution = model.module.get_pred_from_raw_query(model_inputs)
-        else:
+        with autocast(device_type='cuda'):
             video_similarity_score, begin_score_distribution, end_score_distribution = model.get_pred_from_raw_query(model_inputs)
+
+        # if len(args.device_ids) > 1:
+        #     video_similarity_score, begin_score_distribution, end_score_distribution = model.module.get_pred_from_raw_query(model_inputs)
+        # else:
+        #     video_similarity_score, begin_score_distribution, end_score_distribution = model.get_pred_from_raw_query(model_inputs)
 
         # if is_svmr:
         #     _svmr_st_probs = begin_score_distribution[:, 0]
@@ -95,8 +95,8 @@ def compute_query2vid(model, eval_dataset, args, max_before_nms=200, max_vcmr_vi
         #     _svmr_st_probs = F.softmax(_svmr_st_probs, dim=-1)
         #     _svmr_ed_probs = F.softmax(_svmr_ed_probs, dim=-1)
 
-        #     svmr_gt_st_probs[idx*query_batch_size : (idx+1)*query_batch_size] = _svmr_st_probs.cpu().numpy()
-        #     svmr_gt_ed_probs[idx*query_batch_size : (idx+1)*query_batch_size] = _svmr_ed_probs.cpu().numpy()
+        #     svmr_gt_st_probs[idx*query_batch_size : (idx+1)*query_batch_size] = _svmr_st_probs.detach().cpu().numpy()
+        #     svmr_gt_ed_probs[idx*query_batch_size : (idx+1)*query_batch_size] = _svmr_ed_probs.detach().cpu().numpy()
 
         _vcmr_st_prob = begin_score_distribution[:, 1:]
         _vcmr_ed_prob = end_score_distribution[:, 1:]
@@ -107,9 +107,9 @@ def compute_query2vid(model, eval_dataset, args, max_before_nms=200, max_vcmr_vi
         _query_context_scores = torch.softmax(video_similarity_score,dim=1)
         _sorted_q2c_scores, _sorted_q2c_indices = torch.topk(_query_context_scores, max_vcmr_video, dim=1, largest=True)
 
-        # if is_vr:
-        #     sorted_q2c_indices[idx*query_batch_size : (idx+1)*query_batch_size] = _sorted_q2c_indices.cpu().numpy()
-        #     sorted_q2c_scores[idx*query_batch_size : (idx+1)*query_batch_size] = _sorted_q2c_scores.cpu().numpy()
+        if is_vr:
+            sorted_q2c_indices[idx*query_batch_size : (idx+1)*query_batch_size] = _sorted_q2c_indices.detach().cpu().numpy()
+            sorted_q2c_scores[idx*query_batch_size : (idx+1)*query_batch_size] = _sorted_q2c_scores.detach().cpu().numpy()
 
         # if not is_vcmr:
         #     continue
@@ -132,8 +132,8 @@ def compute_query2vid(model, eval_dataset, args, max_before_nms=200, max_vcmr_vi
         _flat_st_ed_scores = _st_ed_scores.reshape(_n_q, -1)
         _flat_st_ed_sorted_scores, _flat_st_ed_scores_sorted_indices = torch.sort(_flat_st_ed_scores, dim=1, descending=True)
 
-        flat_st_ed_sorted_scores[idx*query_batch_size : (idx+1)*query_batch_size] = _flat_st_ed_sorted_scores[:, :max_before_nms].cpu().numpy()
-        flat_st_ed_scores_sorted_indices[idx*query_batch_size : (idx+1)*query_batch_size] = _flat_st_ed_scores_sorted_indices[:, :max_before_nms].cpu().numpy()
+        flat_st_ed_sorted_scores[idx*query_batch_size : (idx+1)*query_batch_size] = _flat_st_ed_sorted_scores[:, :max_before_nms].detach().cpu().numpy()
+        flat_st_ed_scores_sorted_indices[idx*query_batch_size : (idx+1)*query_batch_size] = _flat_st_ed_scores_sorted_indices[:, :max_before_nms].detach().cpu().numpy()
 
     vr_res = []
     if is_vr:
@@ -157,8 +157,8 @@ def compute_query2vid(model, eval_dataset, args, max_before_nms=200, max_vcmr_vi
             video_indices_local, pred_st_indices, pred_ed_indices = np.unravel_index(_flat_st_ed_scores_sorted_indices, shape=(max_vcmr_video, args.max_vid_len, args.max_vid_len))
             video_indices = sorted_q2c_indices[i, video_indices_local]
 
-            pred_st_in_seconds = pred_st_indices.astype(np.float32) * 1.5
-            pred_ed_in_seconds = pred_ed_indices.astype(np.float32) * 1.5 + 1.5
+            pred_st_in_seconds = pred_st_indices.astype(np.float16) * 1.5
+            pred_ed_in_seconds = pred_ed_indices.astype(np.float16) * 1.5 + 1.5
             vcmr_predictions = []
             max_vcmr_vid_name_pool = ann_info[i]["max_vcmr_vid_name_list"]
             for j, (v_score, v_name_idx) in enumerate(zip(_flat_st_ed_sorted_scores, video_indices)):  # videos
