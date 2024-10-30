@@ -39,8 +39,8 @@ def build_optimizer(model, opts):
 def train(model, train_set, corpus_set, val_set, test_set, args, logger):
 
     scaler = GradScaler()
-    train_loader = DataLoader(train_set, collate_fn=collate_fn, batch_size=args.batch, num_workers=args.num_workers, shuffle=True, pin_memory=True)
-    corpus_loader = DataLoader(corpus_set, collate_fn=collate_fn, batch_size=args.batch, num_workers=args.num_workers, shuffle=True, pin_memory=True)
+    train_loader = DataLoader(train_set, collate_fn=collate_fn, batch_size=args.local_batch_size, num_workers=args.num_workers, shuffle=True, pin_memory=True)
+    corpus_loader = DataLoader(corpus_set, collate_fn=collate_fn, batch_size=args.local_batch_size, num_workers=args.num_workers, shuffle=True, pin_memory=True)
     val_loader = DataLoader(val_set, collate_fn=collate_fn, batch_size=1, num_workers=args.num_workers, shuffle=False, pin_memory=True)
     test_loader = DataLoader(test_set, collate_fn=collate_fn, batch_size=1, num_workers=args.num_workers, shuffle=False, pin_memory=True)
     corpus_video_list = corpus_set.corpus_video_list
@@ -49,7 +49,7 @@ def train(model, train_set, corpus_set, val_set, test_set, args, logger):
 
     # Prepare optimizer
     optimizer = build_optimizer(model, args)
-    model = model.half()
+    # model = model.half()
     best_val_ndcg = 0.0
     start_epoch = 0 
     eval_step = int(len(train_loader) // args.eval_folds)
@@ -60,21 +60,22 @@ def train(model, train_set, corpus_set, val_set, test_set, args, logger):
         for step, batch in tqdm(enumerate(train_loader), desc=f"Training", total=num_training):
             step = step + 1
             # continue
-            # model_inputs = set_cuda(batch["model_inputs"], args.device)
+            model_inputs = set_cuda(batch["model_inputs"], args.device)
 
-            with autocast(device_type='cuda'):
-                optimizer.zero_grad()
-                model_inputs = set_cuda_half(batch["model_inputs"], args.device)
-                loss = model(model_inputs)
-                print(loss)
-                scaler.scale(loss).backward()
-                # loss.backward()
-                loss_meter.update(loss.item())
-                optimizer.step()
+            # with autocast(device_type='cuda'):
+            optimizer.zero_grad()
+            # model_inputs = set_cuda_half(batch["model_inputs"], args.device)
+            loss = model(model_inputs)
+            # print(loss)
+            # scaler.scale(loss).backward()
+            loss.backward()
+            loss_meter.update(loss.item())
+            optimizer.step()
 
-            bestmodel_path = os.path.join(args.results_dir, "best_model.pt")
-            save_model(model, optimizer, epoch, bestmodel_path, logger)
-        
+            # if step > 100:
+        bestmodel_path = os.path.join(args.results_dir, f"{epoch}_model.pt")
+        save_model(model, optimizer, epoch, bestmodel_path, logger)
+
             # if step % args.log_interval == 0:
             #     logger.info(f"EPOCH {epoch}/{args.n_epoch} | STEP: {step}|{len(train_loader)} | Loss: {loss_meter.avg:.4f}")
             #     loss_meter.reset()
@@ -97,7 +98,7 @@ def train(model, train_set, corpus_set, val_set, test_set, args, logger):
             #         save_model(model, optimizer, epoch, bestmodel_path, logger)
 
 
-def train_squid():
+if __name__ == '__main__':
     args = SharedOpt().parse()
     logger = get_logger(args.results_dir, args.exp)
 
@@ -134,7 +135,4 @@ def train_squid():
     logger.info("Start Training...")
     train(model, train_set, corpus_set, val_set, test_set, args, logger)
 
-
-if __name__ == '__main__':
-    model_dir, eval_type  = train_squid()
 

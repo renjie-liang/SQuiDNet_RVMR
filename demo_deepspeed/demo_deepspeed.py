@@ -23,7 +23,7 @@ class SimpleModel(nn.Module):
 def generate_data(num_samples, input_dim):
     X = np.random.rand(num_samples, input_dim)
     y = np.random.rand(num_samples, 1)
-    return torch.tensor(X, dtype=torch.float16), torch.tensor(y, dtype=torch.float16)
+    return torch.tensor(X, dtype=torch.float32), torch.tensor(y, dtype=torch.float32)
 
 # Configuration for DeepSpeed
 # deepspeed_config =  {

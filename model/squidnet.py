@@ -64,7 +64,7 @@ class SQuiDNet(nn.Module):
         return vs_feat
     
     def VQMMA_Plus(self, vid_feat, sub_feat, query_feat, vid_mask, query_mask):
-
+        # breakpoint()
         vs_feat = self.vs_fusion_with_nvld_query(vid_feat, sub_feat, query_feat)
 
         vq_feat = self.VQMMA(vs_feat, query_feat, vid_mask, query_mask)

@@ -81,7 +81,7 @@ def set_cuda_half(batch,device):
 
 def mask_logits(target, mask):
     res =  target * mask + (1 - mask) * N_Infinite
-    return res.half()
+    return res
 
 # def vcmr_collate(batch):
 #     batch_annotation = [e["annotation"] for e in batch]  # no need to collate

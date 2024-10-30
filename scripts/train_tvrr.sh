@@ -3,8 +3,6 @@ python train.py \
     --exp debug \
     --model_config config/model_config.json \
     --data_config config/data_config_tvrr.json \
-    --batch 16 \
-    --max_vcmr_video 10 \
-    --loss_measure moment_video \
+    --local_batch_size 16 \
     --num_workers 8 \
-    --eval_folds 1
+    --eval_folds 10

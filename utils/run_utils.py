@@ -87,7 +87,7 @@ def generate_min_max_length_mask(array_shape, min_l, max_l):
     """
     single_dims = (1, ) * (len(array_shape) - 2)
     mask_shape = single_dims + array_shape[-2:]
-    extra_length_mask_array = np.ones(mask_shape, dtype=np.float16)  # (1, ..., 1, L, L)
+    extra_length_mask_array = np.ones(mask_shape, dtype=np.float32)  # (1, ..., 1, L, L)
     mask_triu = np.triu(extra_length_mask_array, k=min_l)
     mask_triu_reversed = 1 - np.triu(extra_length_mask_array, k=max_l)
     final_prob_mask = mask_triu * mask_triu_reversed

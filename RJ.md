@@ -1,6 +1,8 @@
-srun --partition=gpu --gres=gpu:2 --nodes=1 --cpus-per-task=32 --mem=300gb --time=01:00:00 --account=bianjiang --qos=bianjiang --reservation=bianjiang --pty bash -i
+srun --partition=gpu --gres=gpu:1 --nodes=1 --cpus-per-task=32 --mem=300gb --time=05:00:00 --account=bianjiang --qos=bianjiang --reservation=bianjiang --pty bash -i
 
 micromamba activate r2gen
+sh scripts/train_tvrr.sh 
+sh scripts/infer_tvrr.sh 
 
 sh scripts/train_tvrr_deepspeed.sh 
 sh scripts/infer_tvrr_deepspeed.sh 
@@ -9,7 +11,6 @@ export CUDA_HOME=/red/bianjiang/liang.renjie/micromamba/envs/squid
 export PATH=$CUDA_HOME/bin:$PATH
 export LD_LIBRARY_PATH=$CUDA_HOME/lib64:$LD_LIBRARY_PATH
 
-sh scripts/train_tvrr_top01.sh 
 sh scripts/train_tvrr.sh 
 sh scripts/train.sh 
 

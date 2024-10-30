@@ -18,7 +18,7 @@ def load_jsonl(filename):
         return [json.loads(l.strip("\n")) for l in f.readlines()]
 
 
-def pad_sequences_1d_np(sequences, dtype=np.float16):
+def pad_sequences_1d_np(sequences, dtype=np.float32):
 
     """ Pad a single-nested list or a sequence of n-d array (torch.tensor or np.ndarray)
     into a (n+1)-d array, only allow the first dim has variable lengths.
@@ -31,9 +31,9 @@ def pad_sequences_1d_np(sequences, dtype=np.float16):
               1 indicate valid, 0 otherwise
     Examples:
         >>> test_data_list = [[1,2,3], [1,2], [3,4,7,9]]
-        >>> pad_sequences_1d(test_data_list, dtype=np.float16)
+        >>> pad_sequences_1d(test_data_list, dtype=np.float32)
         >>> test_data_3d = [np.random.randn(2,3,4), np.random.randn(4,3,4), np.random.randn(1,3,4)]
-        >>> pad_sequences_1d(test_data_3d, dtype=np.float16)
+        >>> pad_sequences_1d(test_data_3d, dtype=np.float32)
     """
     if isinstance(sequences[0], list):
         sequences = [np.asarray(s, dtype=dtype) for s in sequences]
@@ -42,7 +42,7 @@ def pad_sequences_1d_np(sequences, dtype=np.float16):
     lengths = [len(seq) for seq in sequences]
     assert "numpy" in str(dtype), "dtype and input type does not match"
     padded_seqs = np.zeros((len(sequences), max(lengths)) + extra_dims, dtype=dtype)
-    mask = np.zeros((len(sequences), max(lengths)), dtype=np.float16)
+    mask = np.zeros((len(sequences), max(lengths)), dtype=np.float32)
 
     for idx, seq in enumerate(sequences):
         end = lengths[idx]
@@ -154,7 +154,7 @@ def eval_by_task_type(moment_predictions, video2idx, ground_truth,
             continue
         pred_info_matrix = np.array(
             [e[:3] for e in predictions_by_desc_id[k]["predictions"]][:max_pred_per_query],
-            dtype=np.float16)  # (n_pred, 3)
+            dtype=np.float32)  # (n_pred, 3)
         if use_desc_type:
             desc_types.append(desc_type2idx[gt_item["type"]])
         num = cal_len(gt_item['desc'])
@@ -169,7 +169,7 @@ def eval_by_task_type(moment_predictions, video2idx, ground_truth,
             least_n_overlap = 2  # True if overlapped with at least least_n_overlap GT ts.
             iou_corrects_dict = defaultdict(list)
             for single_gt_ts in gt_item["ts"]:
-                single_gt_ts = np.array(single_gt_ts, dtype=np.float16)  # (2, )
+                single_gt_ts = np.array(single_gt_ts, dtype=np.float32)  # (2, )
                 # iou scores of the predictions that have wrong vid_name are set to 0.
                 iou_scores = compute_temporal_iou_batch(pred_info_matrix[:, 1:3], single_gt_ts) * vid_name_matched_pred
                 for iou_thd in iou_thds:
@@ -179,7 +179,7 @@ def eval_by_task_type(moment_predictions, video2idx, ground_truth,
                 iou_thd_corrects_columns.append(iou_corrects[:, None])
 
         else:  # should be 2, len([st, ed]) == 2
-            single_gt_ts = np.array(gt_item["ts"], dtype=np.float16)  # (2, )
+            single_gt_ts = np.array(gt_item["ts"], dtype=np.float32)  # (2, )
             # iou scores of the predictions that have wrong vid_name are set to 0.
             iou_scores = compute_temporal_iou_batch(pred_info_matrix[:, 1:3], single_gt_ts) * vid_name_matched_pred
 
