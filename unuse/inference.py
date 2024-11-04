@@ -77,11 +77,11 @@ def compute_query2vid(model, eval_dataset, args, max_before_nms=200, max_vcmr_vi
     for idx, batch in tqdm(enumerate(query_eval_loader), desc="Computing q embedding", total=len(query_eval_loader)):
 
         ann_info.extend(batch["annotation"])
-        # model_inputs = set_cuda(batch["model_inputs"], args.device)
-        model_inputs = set_cuda_half(batch["model_inputs"], args.device)
+        model_inputs = set_cuda(batch["model_inputs"], args.device)
+        # model_inputs = set_cuda_half(batch["model_inputs"], args.device)
 
-        with autocast(device_type='cuda'):
-            video_similarity_score, begin_score_distribution, end_score_distribution = model.get_pred_from_raw_query(model_inputs)
+        # with autocast(device_type='cuda'):
+        video_similarity_score, begin_score_distribution, end_score_distribution = model.get_pred_from_raw_query(model_inputs)
 
         # if len(args.device_ids) > 1:
         #     video_similarity_score, begin_score_distribution, end_score_distribution = model.module.get_pred_from_raw_query(model_inputs)

@@ -54,7 +54,7 @@ def train(model, train_set, corpus_set, val_set, test_set, vcmr_eval_dataset, ar
 
     # Prepare optimizer
     optimizer = build_optimizer(model, args)
-    model = model.half()
+    # model = model.half()
     best_val_ndcg = 0.0
     start_epoch = 0 
     eval_step = int(len(train_loader) // args.eval_folds)
@@ -67,15 +67,16 @@ def train(model, train_set, corpus_set, val_set, test_set, vcmr_eval_dataset, ar
             # continue
             model_inputs = set_cuda(batch["model_inputs"], args.device)
 
-            with autocast(device_type='cuda'):
-                optimizer.zero_grad()
-                model_inputs = set_cuda_half(batch["model_inputs"], args.device)
-                loss = model(model_inputs)
-                print(loss)
-                scaler.scale(loss).backward()
-                # loss.backward()
-                loss_meter.update(loss.item())
-                optimizer.step()
+            # with autocast(device_type='cuda'):
+            optimizer.zero_grad()
+            model_inputs = set_cuda(batch["model_inputs"], args.device)
+            # model_inputs = set_cuda_half(batch["model_inputs"], args.device)
+            loss = model(model_inputs)
+            print(loss)
+            # scaler.scale(loss).backward()
+            loss.backward()
+            loss_meter.update(loss.item())
+            optimizer.step()
 
             if step % args.log_interval == 0:
                 logger.info(f"EPOCH {epoch}/{args.n_epoch} | STEP: {step}|{len(train_loader)} | Loss: {loss_meter.avg:.4f}")
@@ -88,7 +89,6 @@ def train(model, train_set, corpus_set, val_set, test_set, vcmr_eval_dataset, ar
             if step % eval_step == 0  or step == len(train_loader):
                 eval_res = compute_query2vid(model, vcmr_eval_dataset, args, max_before_nms=args.max_before_nms, max_vcmr_video=args.max_vcmr_video)
                 eval_res["vid2idx"] = vcmr_eval_dataset.vid2idx
-
                 IOU_THDS = (0.5, 0.7)
                 logger.info("Saving/Evaluating before nms results")
                 submission_path = os.path.join(args.results_dir, "vcmr_predictions.json")
@@ -98,24 +98,24 @@ def train(model, train_set, corpus_set, val_set, test_set, vcmr_eval_dataset, ar
                 metrics = eval_retrieval(eval_submission, vcmr_eval_dataset.query_data, iou_thds=IOU_THDS, match_number=True, verbose=False, use_desc_type=args.data_name == "tvr")
                 logger.info(metrics)
 
+
+
+            if step % eval_step == 0  or step == len(train_loader):
+                corpus_feature = grab_corpus_feature(model, corpus_loader, args.device)
+                val_ndcg_iou = eval_epoch(model, corpus_feature, val_loader, val_gt, args, corpus_video_list)
+                # test_ndcg_iou = eval_epoch(model, corpus_feature, test_loader, test_gt, args, corpus_video_list)
+                logger_ndcg_iou(val_ndcg_iou, logger, "VAL")
+                # logger_ndcg_iou(test_ndcg_iou, logger, "TEST")
+
+                if val_ndcg_iou[20][0.5] > best_val_ndcg:
+                    best_val_ndcg = val_ndcg_iou[20][0.5]
+                    logger_ndcg_iou(val_ndcg_iou, logger, "BEST VAL")
+                    # logger_ndcg_iou(test_ndcg_iou, logger, "BEST TEST")
+                    bestmodel_path = os.path.join(args.results_dir, "best_model.pt")
+                    save_model(model, optimizer, epoch, bestmodel_path, logger)
+
         bestmodel_path = os.path.join(args.results_dir, f"{epoch}_model.pt")
         save_model(model, optimizer, epoch, bestmodel_path, logger)
-
-
-            # if step % eval_step == 0  or step == len(train_loader):
-            #     corpus_feature = grab_corpus_feature(model, corpus_loader, args.device)
-            #     val_ndcg_iou = eval_epoch(model, corpus_feature, val_loader, val_gt, args, corpus_video_list)
-            #     # test_ndcg_iou = eval_epoch(model, corpus_feature, test_loader, test_gt, args, corpus_video_list)
-            #     logger_ndcg_iou(val_ndcg_iou, logger, "VAL")
-            #     # logger_ndcg_iou(test_ndcg_iou, logger, "TEST")
-
-            #     if val_ndcg_iou[20][0.5] > best_val_ndcg:
-            #         best_val_ndcg = val_ndcg_iou[20][0.5]
-            #         logger_ndcg_iou(val_ndcg_iou, logger, "BEST VAL")
-            #         # logger_ndcg_iou(test_ndcg_iou, logger, "BEST TEST")
-            #         bestmodel_path = os.path.join(args.results_dir, "best_model.pt")
-            #         save_model(model, optimizer, epoch, bestmodel_path, logger)
-
 
 if __name__ == '__main__':
     args = SharedOpt().parse()

@@ -46,6 +46,7 @@ class SharedOpt(object):
         self.parser.add_argument("--max_es_cnt", type=int, default=3,help="number of epochs to early stop, -1: no use of early stop")
         self.parser.add_argument("--global_batch_size", type=int, default=None, help="global batch size")
         self.parser.add_argument("--local_batch_size", type=int, default=None, help="local batch size")
+        self.parser.add_argument("--local_eval_batch_size", type=int, default=None, help="local batch size")
         self.parser.add_argument("--no_eval_untrained", action="store_true", help="Evaluate for debug")
         self.parser.add_argument("--grad_clip", type=float, default=-1, help="perform gradient clip, -1: disable")
         self.parser.add_argument("--eval_epoch_num", type=int, default=1, help="eval_epoch_num")
@@ -77,7 +78,7 @@ class SharedOpt(object):
         self.parser.add_argument("--min_pred_l", type=int, default=0, help="minimum prediction (minimum moments)")
         self.parser.add_argument("--max_pred_l", type=int, default=24, help="maximum prediction (maximum moments)")
         self.parser.add_argument("--max_before_nms", type=int, default=200)
-        self.parser.add_argument("--max_vcmr_video", type=int, default=10, help="ranking in top-max_vcmr_video")
+        self.parser.add_argument("--max_vcmr_video", type=int, default=15, help="ranking in top-max_vcmr_video")
         self.parser.add_argument("--nms_thd", type=float, default=-1, help="optinally use non-maximum suppression")
         # can use config files
         self.parser.add_argument('--config', help='JSON config file')

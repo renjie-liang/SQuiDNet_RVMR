@@ -1,0 +1,23 @@
+{
+  "query_path": "data/features/query_bert.h5",
+  "sub_path": "data/data/sub_query_feature/roberta_sub",
+  "vid_path": "data/data/video_feature/resnet_slowfast_1.5",
+  "train_data_path": "data/TVR-Ranking/train_top20_noun_verb_cleaned.json",
+  "val_data_path": "data/TVR-Ranking/val_noun_verb_cleaned.json",
+  "test_data_path": "data/TVR-Ranking/test_noun_verb_cleaned.json",
+  "bmr_path": "data/TVR-Ranking/new_bmr_pred_lmdb",
+  "eval_bmr_path": "bmr/bmr_prd_val_tvr",
+  "test_bmr_path": "bmr/bmr_prd_test_public_tvr",
+  "corpus_path": "data/TVR_Ranking/video_corpus.json",
+  "video_duration_idx_path": "text_data_ref/tvr_video2dur_idx.json",
+  "cctable_path": "./data/data/coocurrence_table/cctable_update.json",
+
+  "data_path": "./data/data",
+  "vcmr_query_path": "sub_query_feature/roberta_query",
+  "vcmr_eval_data_path": "text_data_ref/tvr_val_release_noun_predicate.jsonl",
+  "vcmr_eval_bmr_path": "bmr/bmr_prd_val_tvr",
+  "vcmr_video_duration_idx_path": "text_data_ref/tvr_video2dur_idx.json",
+  "vcmr_cctable_path": "coocurrence_table/cctable_update.json"
+
+
+}

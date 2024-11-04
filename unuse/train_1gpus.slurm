@@ -17,12 +17,13 @@ eval "$(micromamba shell hook --shell bash)"
 
 micromamba activate r2gen
 
-python train.py \
-    --exp top01_vcmr \
+python train_bmr.py \
+    --exp top20_bmr \
     --model_config config/model_config.json \
-    --data_config config/data_config_tvrr.json \
-    --local_batch_size 16 \
+    --data_config config/data_config_top20.json \
+    --local_batch_size 8 \
+    --local_eval_batch_size 4 \
     --loss_measure moment_video \
     --num_workers 8 \
-    --eval_folds 1 \
+    --eval_folds 0.2 \
     --lr 1e-5

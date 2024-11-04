@@ -1,9 +1,10 @@
-srun --partition=gpu --gres=gpu:1 --nodes=1 --cpus-per-task=32 --mem=300gb --time=05:00:00 --account=bianjiang --qos=bianjiang --reservation=bianjiang --pty bash -i
+srun --partition=gpu --gres=gpu:1 --nodes=1 --cpus-per-task=16 --mem=300gb --time=05:00:00 --account=bianjiang --qos=bianjiang --reservation=bianjiang --pty bash -i
 
 micromamba activate r2gen
 sh scripts/train_tvrr.sh 
 sh scripts/infer_tvrr.sh 
 sh scripts/infer_old.sh 
+sh scripts/train_tvrr_bmr.sh 
 
 sh scripts/train_tvrr_deepspeed.sh 
 sh scripts/infer_tvrr_deepspeed.sh 
@@ -19,6 +20,7 @@ sh scripts/train.sh
 
 
 /red/bianjiang/liang.renjie/RVMR/TVR-Ranking/data/features
+
 
 
 

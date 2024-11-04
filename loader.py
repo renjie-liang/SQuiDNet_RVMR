@@ -142,7 +142,10 @@ class BaseDataset(Dataset):
 class SQTrainDataset(BaseDataset):
     def __init__(self, data_path, config, max_vid_len=100, max_query_len=30, is_val=False, neg_bmr_pred_num=3, bmr_allowance=500, max_vcmr_video=10):
 
-        self.query_data = expand_annotations(load_json(data_path))
+        raw_anno = load_json(data_path)
+        self.query_data = expand_annotations(raw_anno)
+
+        self.ground_truth = self.get_relevant_moment_gt(raw_anno)
 
         self.max_vid_len = max_vid_len
         self.max_query_len = max_query_len
@@ -166,8 +169,17 @@ class SQTrainDataset(BaseDataset):
         with open(config.cctable_path, 'r') as ftmp:
             self.cctable = json.load(ftmp)
 
-        self.vname_duration = load_json(config.corpus_path)
+        self.data_root = config.data_path # ./data
+        tmp_vid_data = load_json(os.path.join(self.data_root, config.vcmr_video_duration_idx_path))
+        self.idx2vid = {}
+        self.vid2idx = {}
+        for _, set_data in tmp_vid_data.items():
+            for vname, v in set_data.items():
+                vidx = v[1]
+                self.idx2vid[vidx] = vname
+                self.vid2idx[vname] = vidx
 
+        self.vname_duration = load_json(config.corpus_path)
         self.bmr_allowance = bmr_allowance
         self.max_vcmr_video = max_vcmr_video
 
@@ -211,7 +223,12 @@ class SQTrainDataset(BaseDataset):
         model_inputs["st_ed_indices"] =  torch.LongTensor([start_idx, end_idx])
 
         return dict(annotation=annotation, model_inputs=model_inputs)
-
+    
+    def get_relevant_moment_gt(self, annotations):
+        gt_all = {}
+        for data in annotations:
+            gt_all[data["query_id"]] = data["relevant_moment"]
+        return gt_all
 
 class SQCorpusDataset(BaseDataset):
     def __init__(self, data_path, config, max_vid_len=100, bmr_allowance=500, max_vcmr_video=10):

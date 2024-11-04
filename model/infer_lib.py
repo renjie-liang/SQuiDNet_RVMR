@@ -141,3 +141,93 @@ def calculate_average_ndcg(all_query_id, all_start_prob, all_query_score, all_en
     save_json(all_pred, os.path.join(args.results_dir, "pred_results.json"))
     average_ndcg = calculate_ndcg_iou(eval_gt, all_pred, args.iou_threshold, args.ndcg_topk)
     return average_ndcg
+
+
+
+
+def generate_min_max_mask(array_shape, min_l, max_l):
+    single_dims = (1, ) * (len(array_shape) - 2)
+    mask_shape = single_dims + array_shape[-2:]
+    extra_length_mask_array = np.ones(mask_shape, dtype=np.float16) 
+    mask_triu = np.triu(extra_length_mask_array, k=min_l)
+    mask_triu_reversed = 1 - np.triu(extra_length_mask_array, k=max_l)
+    final_prob_mask = mask_triu * mask_triu_reversed
+    return final_prob_mask
+
+from torch.utils.data import DataLoader
+from utils.model_utils import set_cuda, vcmr_collate
+
+def eval_rvmr(model, eval_dataset, args, max_before_nms=200, max_vcmr_video=100, maxtopk = 40):
+    query_batch_size = args.local_eval_batch_size
+    model.eval()
+    query_eval_loader = DataLoader(eval_dataset, collate_fn=vcmr_collate, batch_size=query_batch_size, num_workers=args.num_workers, shuffle=False, pin_memory=True)
+
+    n_total_query = len(eval_dataset)
+
+    flat_st_ed_scores_sorted_indices = np.empty((n_total_query, max_before_nms), dtype=int)
+    flat_st_ed_sorted_scores = np.zeros((n_total_query, max_before_nms), dtype=np.float32)
+    sorted_q2c_indices = np.empty((n_total_query, max_vcmr_video), dtype=int)
+    sorted_q2c_scores = np.empty((n_total_query, max_vcmr_video), dtype=np.float32)
+
+    ann_info = []
+    for idx, batch in tqdm(enumerate(query_eval_loader), desc="Computing q embedding", total=len(query_eval_loader)):
+
+        ann_info.extend(batch["annotation"])
+        model_inputs = set_cuda(batch["model_inputs"], args.device)
+        video_similarity_score, begin_score_distribution, end_score_distribution = model.get_pred_from_raw_query(model_inputs)
+
+        _vcmr_st_prob = begin_score_distribution[:, 1:]
+        _vcmr_ed_prob = end_score_distribution[:, 1:]
+
+        video_similarity_score = video_similarity_score[:, 1:] # first element holds ground-truth information
+        _query_context_scores = torch.softmax(video_similarity_score,dim=1)
+        _sorted_q2c_scores, _sorted_q2c_indices = torch.topk(_query_context_scores, max_vcmr_video, dim=1, largest=True)
+
+        sorted_q2c_indices[idx*query_batch_size : (idx+1)*query_batch_size] = _sorted_q2c_indices.detach().cpu().numpy()
+        sorted_q2c_scores[idx*query_batch_size : (idx+1)*query_batch_size] = _sorted_q2c_scores.detach().cpu().numpy()
+
+
+        _st_probs = F.softmax(_vcmr_st_prob, dim=-1)  # (query_batch, video_corpus, vid_len)
+        _ed_probs = F.softmax(_vcmr_ed_prob, dim=-1)
+
+        row_indices = torch.arange(0, len(_st_probs), device=args.device).unsqueeze(1)
+        _st_probs = _st_probs[row_indices, _sorted_q2c_indices] 
+        _ed_probs = _ed_probs[row_indices, _sorted_q2c_indices]
+
+        _st_ed_scores = torch.einsum("qvm,qv,qvn->qvmn", _st_probs, _sorted_q2c_scores, _ed_probs)
+
+        valid_prob_mask = generate_min_max_mask(_st_ed_scores.shape, min_l=args.min_pred_l, max_l=args.max_pred_l)
+
+        _st_ed_scores *= torch.from_numpy(valid_prob_mask).to(_st_ed_scores.device)
+
+        _n_q  = _st_ed_scores.shape[0]
+
+        _flat_st_ed_scores = _st_ed_scores.reshape(_n_q, -1)
+        _flat_st_ed_sorted_scores, _flat_st_ed_scores_sorted_indices = torch.sort(_flat_st_ed_scores, dim=1, descending=True)
+
+        flat_st_ed_sorted_scores[idx*query_batch_size : (idx+1)*query_batch_size] = _flat_st_ed_sorted_scores[:, :max_before_nms].detach().cpu().numpy()
+        flat_st_ed_scores_sorted_indices[idx*query_batch_size : (idx+1)*query_batch_size] = _flat_st_ed_scores_sorted_indices[:, :max_before_nms].detach().cpu().numpy()
+
+
+    rvmr_res = {}
+    for i, (_flat_st_ed_scores_sorted_indices, _flat_st_ed_sorted_scores) in tqdm(enumerate(zip(flat_st_ed_scores_sorted_indices, flat_st_ed_sorted_scores)),desc="[VCMR]", total=n_total_query):
+        video_indices_local, pred_st_indices, pred_ed_indices = np.unravel_index(_flat_st_ed_scores_sorted_indices, shape=(max_vcmr_video, args.max_vid_len, args.max_vid_len))
+        video_indices = sorted_q2c_indices[i, video_indices_local]
+
+        pred_st_in_seconds = pred_st_indices.astype(np.float32) * 1.5
+        pred_ed_in_seconds = pred_ed_indices.astype(np.float32) * 1.5 + 1.5
+        max_vcmr_vid_name_pool = ann_info[i]["max_vcmr_vid_name_list"]
+        cur_vcmr_redictions = []
+        for j, (v_score, v_name_idx) in enumerate(zip(_flat_st_ed_sorted_scores, video_indices)):  # videos
+            video_idx = max_vcmr_vid_name_pool[v_name_idx]
+            cur_vcmr_redictions.append(
+                    {
+                    "video_name": video_idx,
+                    "timestamp": [float(pred_st_in_seconds[j]), float(pred_ed_in_seconds[j])],
+                    "model_scores": float(v_score)
+                }
+            )
+        query_id = ann_info[i]['desc_id']
+        rvmr_res[query_id] = cur_vcmr_redictions[:maxtopk]
+
+    return rvmr_res
